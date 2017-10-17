@@ -1,0 +1,112 @@
+\documentclass[a4paper,11pt]{article}
+\usepackage[english]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{fourier}
+\usepackage{yfonts}
+\usepackage[hmargin=3cm,vmargin=3cm]{geometry}
+\usepackage{units}
+\usepackage{graphicx}
+\usepackage[colorlinks=true]{hyperref}
+
+\renewcommand{\thefootnote}{\fnsymbol{footnote}}
+
+\DeclareMathOperator\sub{\textgoth{S}}
+\DeclareMathOperator\mc{\textgoth{M}}
+\DeclareMathOperator\prf{PRF}
+\DeclareMathOperator\prp{PRP}
+
+\title{Crypto Engineering (GBX9SY03)\\
+TP --- Square attack on $3\nicefrac{1}{2}$ rounds of AES}
+\date{2017-10-20}
+
+\begin{document}
+
+\maketitle{}
+
+\section*{Introduction}
+
+The goal of this TP is to implement a simple, yet effective attack on a reduced version of the AES. This attack (taking the many names of
+``square'', ```saturation'' or ``integral'' attack) is \emph{structural}, in the sense that it does not depend on many details of the AES,
+but rather on its overall SPN structure. In fact, it was first developed for the \textsc{Square} cipher, which is a predecessor
+of the AES (Daemen \& al., 1997), and later generalized to even wider settings (Biryukov and Shamir, 2001).
+
+The attack, like many others in symmetric-key cryptography, is based on a \emph{distinguisher}, i.e. a property that allows to decide if
+one is interacting with a specific algorithm (e.g. the AES) or a ``random'' one (e.g. a random permutation). In our case, the distinguisher
+works on $3$ rounds of the AES, and we will use it to recover the key for $3\nicefrac{1}{2}$ rounds. The idea to do so is the following:
+\begin{enumerate}
+\item Make queries to the $3\nicefrac{1}{2}$ oracle that would allow to observe the distinguisher (on $3$ rounds).
+\item Partially decrypt the oracle answers by $\nicefrac{1}{2}$ rounds, by making a guess on part of the key.
+\item If the guess allows to observe the distinguisher on the partially decrypted ciphertexts, it is assumed to be correct; otherwise another one is made.
+\end{enumerate}
+
+\section*{AES structure and a 3-round distinguisher}
+
+Recall that the AES round function is the composition of four functions: AddRoundKey (ARK), SubBytes (SB), ShiftRows (SR) and MixColumns (MC).
+The last round omits the
+MixColumn function and will be counted as a $\nicefrac{1}{2}$-round.
+The property which we exploit in the distinguisher derives from the fact that XORing all the $2^n$ $n$-bit values results in $0$. 
+In more details, we use the following facts:
+\begin{enumerate}
+\item We call $\lambda$ the set $\{\texttt{0x00}, \ldots, \texttt{0xFF}\}$ of all 8-bit values from 0 to 255.
+As the AES S-box $\sub$ is a permutation, we have that $\bigoplus_{x \in \lambda} \sub(x) = \bigoplus_{x \in \lambda} x = 0$.
+\item We consider a set $\lambda'$ of 256 vectors of $\mathbb{F}_{2^8}^4$ for which one (w.l.o.g. the first) coordinate takes all possible values,
+and the three others are constant. We write such a set as $(\star, c, c, c)^t$. As the MixColumn matrix $\mc$ of the AES
+does not have any zero coefficient, each coordinate of the elements of the set $\{\mc\cdot x,~x \in \lambda'\}$ takes all possible values
+across the set, i.e. the output set is of the form $(\star, \star, \star, \star)^t$.
+\item We consider a set $\lambda''$ of 256 vectors of $\mathbb{F}_{2^8}^4$ of the form $(\star, \star, \star, \star)^t$. For any matrix
+$A = (a_{i,j})$ of $\mathcal{M}_{4}(\mathbb{F}_{2^8})$ (and thence for $\mc$ in particular), the sum of all elements of $\{A\cdot x,~x \in \lambda''\}$
+is the all-zero vector. Indeed, the sum of any of the four coordinates is of the form:
+\[
+\bigoplus_{x \in \lambda} a_{i,0} x \oplus \bigoplus_{x \in \lambda} a_{i,1} x \oplus \bigoplus_{x \in \lambda} a_{i,2} x \oplus \bigoplus_{x \in \lambda} a_{i,3} x,
+\]
+with all $a_{i,j}$s either zero or invertible, hence the above is equal to $0 \oplus 0 \oplus 0 \oplus 0$. We write such an output set as $(\flat, \flat, \flat, \flat)^t$.
+\end{enumerate}
+
+We now define a $\Lambda$-set as a set of 256 16-byte plaintexts with one byte taking all possible values ($\star$), and the fifteen other being constant (in white).
+Thanks to the above facts, we can now graphically follow the propagation of a $\Lambda$-set over three rounds of the AES, in \autoref{fig:square3}\footnote{Figure slightly adapted from \href{https://www.iacr.org/authors/tikz/}{https://www.iacr.org/authors/tikz/}.}.
+
+\begin{figure}[!hbt]
+\centering
+\includegraphics{aes_3r_integral}
+\caption{The 3-round Square distinguisher\label{fig:square3}}
+\end{figure}
+
+In words, the sum after 3 rounds of AES of all the 256 ciphertexts whose corresponding plaintexts form a $\Lambda$-set is zero.
+
+
+\section*{Exercice 1: Warming up with PRPs and PRFs}
+
+The PRP-PRF switching lemma is an important theoretical result that roughly says that up to the birthday bound, a pseudorandom permutation
+behaves as a pseudorandom function (it formalizes the intuition that the only thing distinguishing a random function from a random permutation
+is the absence of collisions in the latter's outputs). As many constructions or modes of operations (such as CBC or CTR) are secure when instantiated
+by a function but not by a permutation (for a concrete analysis, see e.g. McGrew, 2013),
+the problem of designing ``beyond the birthday bound'' PRFs from PRPs is a recurrent topic in cryptography.
+A well-known construction of such a ``fully secure'' PRF is the \emph{XOR of PRP} construction (Bellare \& al., 1998; Lucks, 2000; and many others):
+define $\prf(k_1||k_2, x)$ as $\prp(k_1, x) \oplus \prp(k_2, x)$.
+
+\paragraph*{Q. 1} Using the provided AES functions, instantiate the XOR of PRP construction by using AES reduced to three (full) rounds for the PRP.
+
+\paragraph*{Q. 2} Show that it is not secure by implementing an efficient square/saturation/integral distinguisher.
+
+\section*{Exercice 2: Key-recovery attack for $3\nicefrac{1}{2}$-round AES}
+
+Implement a key-recovery attack for $3\nicefrac{1}{2}$-round AES (i.e. four rounds, with the last one omitting the MixColumn), using the square distinguisher.
+The steps to do so are the following.
+
+\paragraph*{Q. 1} Implement $3\nicefrac{1}{2}$-round AES.
+
+\paragraph*{Q. 2} Implement the partial decryption by $\nicefrac{1}{2}$ round of one state byte, given one byte of the key.
+
+\paragraph*{Q. 3} Implement the entire attack, and test it on randomly generated keys (e.g. obtained from \texttt{/dev/urandom}). That is, query
+your reduced AES on a $\Lambda$-set and iteratively find each byte of the last round key. This can simply be done by guessing the value for each key
+byte separately and discarding wrong guesses by partially decrypting and checking the 3-round distinguisher. However, don't forget to:
+\begin{itemize}
+\item Filter out false positives (if any) by using a few additional $\Lambda$-sets.
+\item Invert the key expansion to recover the original master key.
+\end{itemize} 
+
+
+
+
+\end{document}

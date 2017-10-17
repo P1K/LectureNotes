@@ -1,0 +1,616 @@
+\documentclass[xcolor=table,usenames,dvipsnames,compress]{beamer}
+\usepackage[english]{babel}
+\usepackage{verbatim}
+\usepackage{multirow}
+\usepackage{xspace}
+\usepackage{textcomp}
+\usepackage{bbold}
+\usepackage{MnSymbol}
+\usecolortheme{rose}
+\usepackage{beamerthemeuclcryptov2}
+\usepackage[utf8]{inputenc}
+\usepackage{xcolor}
+\usepackage{pgf}
+\usepackage{rotating}
+\usepackage{tikz}
+\usepackage{listings}
+\usepackage{relsize}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{yfonts}
+\usepackage{fourier-orns}
+\usepackage[normalem]{ulem}
+
+\setbeamercolor{section in head/foot}{fg=structure.fg!75}
+\useinnertheme{default}
+\useoutertheme[subsection=false]{miniframes}
+%\usefonttheme{structureitalicserif}
+\usefonttheme{default}
+\setbeamertemplate{enumerate items}[square]
+\beamertemplatetransparentcovered
+
+% to remove head sections
+\setbeamertemplate{headline}[text line]{\phantom{Bouh}}
+
+
+
+%% Public TikZ libraries
+\usetikzlibrary{positioning}
+\usetikzlibrary{shapes}
+\usetikzlibrary{patterns}
+
+%% Custom TikZ addons
+\usetikzlibrary{crypto.symbols}
+\tikzset{shadows=no}        % Option: add shadows to XOR, ADD, etc.
+
+\definecolor{llgray}{rgb}{0.9,0.9,0.9}
+\definecolor{dgray}{rgb}{0.4,0.4,0.4}
+\definecolor{lgreen}{rgb}{0.05,0.7,0.3}
+\definecolor{lblue}{rgb}{0.3,0.7,0.9}
+\definecolor{llgreen}{rgb}{0.77,0.95,0.77}
+\definecolor{Lgreen}{rgb}{0.3,0.7,0.3}
+
+%
+\newcommand\ie{\emph{i.e.}\xspace}
+\newcommand\eg{\emph{e.g.}\xspace}
+\newcommand\etal{\emph{\& al.}\xspace}
+\newcommand\defas{:=}
+\newcommand\randraw{\xleftarrow{{\scriptscriptstyle\$}}}
+%
+\DeclareMathOperator\hash{\mathcal{H}}
+\DeclareMathOperator\E{\mathcal{E}}
+\DeclareMathOperator\cf{\textswab{f}}
+\DeclareMathOperator\perm{\textswab{p}}
+\DeclareMathOperator\bigo{\mathcal{O}}
+%
+\newcommand\ms{\mathcal{M}}
+\newcommand\ds{\mathcal{D}}
+\newcommand\iv{\text{IV}}
+%
+\AtBeginSection[] {
+ \begin{frame}<beamer>{}
+   \tableofcontents[currentsection,currentsubsection]
+ \end{frame}
+}
+
+%\lstset{emph={x}, emphstyle=\color{Violet},
+%emph={-}, emphstyle=\color{Green},
+%}
+
+\title[Hash functions]{Crypto Engineering (GBX9SY03)\\
+\decosix\\
+Hash functions}
+
+\author[]{Pierre Karpman\\
+\url{pierre.karpman@univ-grenoble-alpes.fr}\\
+{\footnotesize\url{https://www-ljk.imag.fr/membres/Pierre.Karpman/tea.html}}}
+
+\date{2017--10--18}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+% \begin{frame}
+%   \tableofcontents
+% \end{frame}
+%
+%\section{Introduction}
+
+\begin{frame}{First definition}
+\begin{exampleblock}{Hash function}
+A hash function is a mapping $\hash : \ms \rightarrow \ds$
+\end{exampleblock}
+{\footnotesize So it really is just a function...}
+\medskip
+
+Usually:
+\begin{itemize}
+\item $\ms = \bigcup_{\ell < N} \{0,1\}^\ell$, $\ds = \{0,1\}^n$, $N \gg n$
+\item $N$ is typically $\geq 2^{64}$, $n \in \{\text{\xout{128}, \xout{160}, \sout{224}, 256, 384, 512}\}$
+\end{itemize}
+{\footnotesize Also popular now: extendable-output functions (XOFs): $\ds = \bigcup_{\ell < N'} \{0,1\}^\ell$ }
+
+\begin{itemize}
+\item Hash functions are \emph{keyless}
+\item So, how do you tell if one's \textbf{good}?
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Idealized hash functions: Random oracles}
+\begin{exampleblock}{Random oracle}
+A function $\hash : \ms \rightarrow \ds$ s.t. $\forall x \in \ms$, $\hash(x) \randraw \ds$
+\end{exampleblock}
+\begin{itemize}
+\item ``The best we can ever get''
+\item Sometimes useful in proofs (``Random oracle model'', or ROM)
+\item Not possible to have one {\footnotesize(except for small (co-)domains assuming a TRNG)}
+\item But we can get \emph{approximations} (e.g. SHA-3)
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Main security properties}
+What is hard for a RO should be hard for any HF\\
+$\Rightarrow$
+\begin{enumerate}
+\item \textbf{First preimage}: given $t$, find $m$ s.t. $\hash(m) = t$
+\item \textbf{Second preimage}: given $m$, find $m' \neq m$ s.t. $\hash(m) = \hash(m')$
+\item \textbf{Collision}: find $(m, m' \neq m)$ s.t. $\hash(m) = \hash(m')$
+\end{enumerate}
+
+\medskip
+
+Generic complexity:\\
+1), 2): $\Theta(2^n)$;\\
+3): $\Theta(2^{n/2})$ $\leftlsquigarrow$ ``Birthday paradox''
+\end{frame}
+
+\begin{frame}{Why do we care? Applications!}
+Hash functions are useful for:
+\begin{itemize}
+\item Hash-and-sign (RSA signatures, (EC)DSA, ...)
+\item Message-authentication codes (HMAC, ...)
+\item Password hashing (with a grain of salt)
+\item Hash-based signatures (inefficient but PQ)
+\item As ``RO instantiations'' (OAEP, ...)
+\item As one-way functions (OWF)
+\end{itemize}
+\end{frame}
+% TODO expand?
+
+\begin{frame}{So, how do you build hash functions?}
+\begin{itemize}
+\item Objective \#1: be secure
+\item Objective \#2: be efficient
+\begin{itemize}
+\item At most a few dozen cycles/byte!
+\item $\Rightarrow$ work with limited amount of memory
+\end{itemize}
+\end{itemize}
+So...
+\begin{itemize}
+\item (\#2) Build $\hash$ from a \emph{small component}
+\item (\#1) Prove that this is okay
+\end{itemize}
+\end{frame}
+
+\begin{frame}{What kind of small component?}
+\begin{exampleblock}{Compression function}
+A compression function is a mapping $\cf : \{0,1\}^n \times \{0,1\}^b \rightarrow \{0,1\}^n$
+\end{exampleblock}
+\begin{itemize}
+\item A family of functions from $n$ to $n$ bits
+\item Not unlike a block cipher, only not invertible
+\end{itemize}
+\begin{exampleblock}{Permutation}
+A permutation is an invertible mapping $\perm : \{0,1\}^n \rightarrow \{0,1\}^n$
+\end{exampleblock}
+{\footnotesize Yes, very simple}
+\begin{itemize}
+\item Like a block cipher with a fixed key, \eg $\perm = \E(0,\cdot)$
+\end{itemize}
+\end{frame}
+
+\begin{frame}{From small to big (compression function case)}
+Assume a good $\cf$
+
+\medskip
+
+\begin{itemize}
+\item Main problem: fixed-size domain $\{0,1\}^n \times \{0,1\}^b$
+\item Objective: \emph{domain extension} to $\bigcup_{\ell < N} \{0,1\}^\ell$
+\item (Not unlike using a mode of operation with a BC)
+\end{itemize}
+
+\medskip
+
+The classical answer: the Merkle-Damg\aa rd construction (1989)
+\end{frame}
+
+\begin{frame}{MD: with a picture}
+\begin{figure}
+	\input{md.tex}
+\end{figure}
+
+That is: $\hash(m_1||m_2||m_3||\ldots) = \cf(\ldots\cf(\cf(\cf(\iv, m_1), m_2), m_3), \ldots)$
+
+\medskip
+
+pad($m$) $\approx$ $m||1000\ldots00\langle\text{length of }m\rangle$
+\end{frame}
+
+\begin{frame}{MD: does it work?}
+Efficiency?
+\begin{itemize}
+\item Only sequential calls to $\cf$
+\item $\Rightarrow$ fine
+\end{itemize}
+
+Security?
+\begin{itemize}
+\item Still to be shown
+\item Objective: \emph{reduce} security of $\hash$ to that of $\cf$
+\begin{itemize}
+\item ``If $\cf$ is good, then $\hash$ is good''
+\end{itemize}
+\item True for collision and first preimage, \textbf{false} for second preimage
+\end{itemize}
+\end{frame}
+
+\begin{frame}{MD (partial) security proof}
+Method: simple contrapositive argument
+\begin{itemize}
+\item Attack \{$1^\text{st}$preim., coll.\} on $\hash \Rightarrow$ attack \{$1^\text{st}$preim., coll.\} on $\cf$
+\end{itemize}
+
+\begin{alertblock}{First preimage case}
+If $\hash(m_1||m_2||\ldots||m_\ell) = t$, then $\cf(\hash(m_1||m_2||\ldots||m_{\ell-1}), m_\ell) = t$
+\end{alertblock}
+
+\begin{alertblock}{Collision case (sketch)}
+If $\hash(m_1||m_2||\ldots||m_\ell) = \hash(m'_1||m'_2||\ldots||m'_\ell)$, show that $\exists i$ s.t.
+$(h_i \defas \hash(m_1||m_2||\ldots||m_{i-1}), m_i) \neq (h'_i \defas \hash(m'_1||m'_2||\ldots||m'_{i-1}), m'_i)$ and
+$\cf(h_i, m_i) = \cf(h'_i, m'_i)$
+\end{alertblock}
+\begin{itemize}
+\item Proper message padding useful to make it work!
+\end{itemize}
+\end{frame}
+
+\begin{frame}{What about $2^\text{nd}$ preimages??}
+No proof (with optimal resistance), can't have one:
+\begin{itemize}
+\item Generic attack on messages of $2^k$ blocks for a cost $\approx k 2^{n/2+1} + 2^{n-k+1}$ (Kelsey and Schneier, 2005)
+\item Idea: exploit internal collisions in the $h_i$s
+\end{itemize}
+This is not nice, but:
+\begin{itemize}
+\item Requires (very) long messages to gain something
+\item At least as expensive as collision search
+\item If $n$ is chosen s.t. generic collisions are out of reach, we're somewhat fine
+\end{itemize}
+$\Rightarrow$ Didn't make people give up MD hash functions (MD5, SHA-1, SHA-2 family)
+\end{frame}
+
+\begin{frame}{Attack with an expandable message}
+
+\begin{center}
+\includegraphics{2nd-preimage}
+\end{center}
+
+\bigskip
+
+\url{https://www.iacr.org/authors/tikz/}
+\end{frame}
+
+
+\begin{frame}{Is that unavoidable?}
+No! Simple patch: Chop-MD/Wide-pipe MD (Coron \etal, 2005) and (Lucks, 2005)
+\begin{itemize}
+\item Build $\hash$ from $\cf : \{0,1\}^{2n} \times \{0,1\}^b \rightarrow \{0,1\}^{2n}$, truncate output to $n$ bits (say)
+\item Collision in the output $\nRightarrow$ collision in the internal state
+\item Very strong provable guarantees (Coron \etal)
+\begin{itemize}
+\item Secure domain extender for fixed-size RO
+\end{itemize}
+\item Concrete instantiations: SHA-512/224, SHA-512/256 (2015)
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Practical impact of the MD proof}
+
+\begin{itemize}
+\item If one can't attack $\cf$ underlying $\hash$, all is well
+\item Else, ...???
+\item $\Rightarrow$ Attacking $\cf$ is a meaningful goal for cryptographers ($\approx$ (semi-)freestart attacks)
+\item Ideally, \emph{never} use a $\hash$ with broken $\cf$
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{The MD5 failure}
+\vspace{-6mm}
+\begin{itemize}
+\item MD5: designed by Rivest (1992)
+\item 1993: very efficient collision attack on the compression function (den Boer and Bosselaers); mean time of 4 minutes on a 33\,MHz 80386
+\item MD5 still massively used...
+\item 2005: very efficient collision attack on the \emph{hash function} (Wang and Yu)
+\item Still used...
+\item 2007: practically threatening collisions (Stevens \etal)
+\item Still used...
+\item 2009: even worse practical collision attacks (Stevens \etal)
+\item Hmm, maybe we should move on?
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Was this avoidable?}
+Yes!
+\begin{itemize}
+\item Early signs of weaknesses $\Rightarrow$ move to alernatives ASAP!
+\item What were they (among others)?
+\begin{itemize}
+\item 1992: {\color{Red}RIPEMD} (RIPE); practically broken (collisions) 2005 (Wang \etal)
+\item 1993: {\color{Red}SHA-0} (NSA); broken (collisions) 1998 (Chabaud and Joux); practically broken 2005 (Biham \etal)
+\item 1995: {\color{RedOrange}SHA-1} (NSA); broken (collisions) 2005 (Wang \etal); practically broken 2017 (Stevens \etal (and me!))
+\item 1996: {\color{RedOrange}RIPEMD-128} (Dobbertin \etal); broken (collisions) 2013 (Landelle and Peyrin)
+\item 1996: {\color{Green}RIPEMD-160} (Dobbertin \etal); unbroken so far
+\item 2001: {\color{Green}SHA-2} (NSA); unbroken so far
+\end{itemize}
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Lesson to learn?}
+\begin{itemize}
+\item \textbf{DON'T USE BROKEN ALGORITHMS}
+\item \textbf{MOVE AWAY FROM BROKEN ALGORITHMS}
+\item \textbf{DO CARE ABOUT ``THEORETICAL'' ATTACKS}
+\item \textbf{BROKEN CRYPTO IS NOT ``COOL''}
+\end{itemize}
+
+\medskip
+
+Perfect bad example: Git
+\begin{itemize}
+\item Don't use SHA-1 in 2005!
+\item Don't hide needed security properties!
+\end{itemize}
+
+Also:
+\begin{itemize}
+\item Don't use SHA-1, even if you just care about preimage attacks
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Back to design: how to do $\cf$?}
+\begin{enumerate}
+\item Start like a block cipher
+\item Add feedforward to prevent invertibility
+\end{enumerate}
+
+\medskip
+
+Examples:\\
+``Davies-Meyer'': $\cf(h, m) = \E_m(h) \boxplus h$\\
+``Matyas-Meyer-Oseas'': $\cf(h, m) = \E_h(m) \boxplus m$
+
+\medskip
+
+\begin{itemize}
+\item Systematic analysis by Preneel, Govaerts and Vandewalle (1993). ``PGV'' constructions
+\item Then rigorous proofs (in the ideal cipher model) (Black \etal, 2002), (Black \etal, 2010)
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Re: Davies-Meyer}
+Picture:
+
+\medskip
+
+\begin{center}
+\includegraphics[scale=1.5]{Davies-Meyer}
+\end{center}
+
+\medskip
+
+Used in MD4/5 SHA-0/1/2, etc.
+\end{frame}
+
+\begin{frame}{Re: Re: Davies-Meyer}
+\vspace{-4mm}
+
+Why is the ``message'' the ``key''?
+\begin{itemize}
+\item Disconnect chaining value and message length!
+\item $\E$'s block length: fixed by security level
+\item $\E$'s key length: fixed by ``message'' length
+\item Large ``key'' $\Rightarrow$ more efficient
+\item Example: MD5's ``block cipher'' (also bad): 128-bit blocks, 512-bit keys
+\end{itemize}
+
+\medskip
+
+DM incentive: use very simple \emph{message expansion} (``key schedules'')
+\begin{itemize}
+\item To be efficient!
+\item Warning: can be a source of weakness (MD5, SHA-0, SHA-1. Should that be surprising?)
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Major PGV Warning}
+PGV constructions are proved secure in the \emph{ideal cipher model}, \textbf{BUT}
+\begin{itemize}
+\item Real ciphers are not ideal!
+\item Real ciphers \emph{don't have to be ideal} to be okay ciphers
+\begin{itemize}
+\item IDEA (Lai and Massey, 1991): weak key classes (Daemen \etal, 1993)
+\item TEA (Wheeler and Needham, 1994): equivalent keys (Kelsey \etal, 1996)
+\end{itemize}
+\end{itemize}
+
+\medskip
+
+What can go wrong?
+\end{frame}
+
+\begin{frame}{Bad case of crypto design}
+Microsoft needed a hash function for ROM integrity check of the XBOX
+\begin{itemize}
+\item Used TEA in DM mode (Steil, 2005)
+\item {\footnotesize Because of an earlier break of their RC4-CBC-MAC scheme (ibid.)}
+\item Terrible idea, because of existence of equivalent keys!
+\item TEA$(k,m)$ = TEA$(\hat{k},m)$ $\Rightarrow$ DM-TEA$(h,k)$ = DM-TEA$(h,\hat{k})$ $\Rightarrow$ easy collisions!
+\item Got hacked...
+\item {\footnotesize IDEA for a hash function: also bad (Wei \etal, 2012)}
+\end{itemize}
+
+\medskip
+
+\textbf{NEVER DESIGN YOUR OWN CRYPTO!}
+\end{frame}
+
+\begin{frame}{It's not all that bad, tho}
+\begin{itemize}
+\item AES in a PGV construction so far unbroken (see \eg Sasaki (2011))
+\begin{itemize}
+\item But small parameters \textinterrobang
+\end{itemize}
+\item Ditto, SHA-256 as a block cipher: ``SHACAL-2'' (Handschuh and Naccache, 2001)
+\begin{itemize}
+\item Enormous keys, 512 bit!
+\end{itemize} 
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Now just a few examples}
+\vspace{-6mm}
+
+The MD4/MD5/SHA-0/SHA-1 family
+
+\begin{itemize}
+\item Merkle-Damg\aa rd construction 
+\item Davies-Meyer compression function
+\begin{itemize}
+\item 512-bit messages, 128-bit (resp. 160-bit) chaining values for MD4/5 (resp. SHA-0/1)
+\item Ad-hoc ``block cipher'' inside the compression function: \emph{unbalanced ARX Feistel}
+\item Very simple message expansion
+\end{itemize}
+\item All broken (MD4 could be broken \emph{by hand})
+\end{itemize}
+
+RIPEMD family
+\begin{itemize}
+\item Somewhat similar, but uses two parallel lines merged at the end
+\end{itemize}
+
+SHA-2
+\begin{itemize}
+\item Somewhat similar, but heavier message expansion
+\end{itemize}
+\end{frame}
+
+\begin{frame}{ARX? Whazzat?}
+
+\vspace{-4mm}
+
+ARX: Addition, Rotation, XOR
+\begin{itemize}
+\item A minimal set of operations to build (symmetric) cryptography
+\item Used as early as 1987 in the FEAL block cipher (Shimizu and Miyaguchi)
+\item Sometimes enriched with bitwise Boolean functions
+\end{itemize}
+
+\medskip
+
+Example: SHA-1\\
+
+\smallskip
+
+$A_{i+1} = A_i^{\circlearrowleft 5} + \phi_{i\div20}(A_{i-1}, A_{i-2}^{\circlearrowright 2}, A_{i-3}^{\circlearrowright 2}) + A_{i-4}^{\circlearrowright 2} + W_i +K_{i\div20}$
+\begin{itemize}
+\item $A$: the internal state registers (32-bit)
+\item $K$: round constant
+\item $W$: expanded message word (the ``key'')
+\item $\phi$: one of IF, MAJ, XOR
+\end{itemize}
+\end{frame}
+
+\begin{frame}{SHA-1: alternate view}
+\centering
+\includegraphics[scale=0.9]{sha1}
+\end{frame}
+
+\begin{frame}{More on SHA: message expansion}
+\vspace{-4mm}
+
+SHA-1 has 80 steps, $W_i$s are 32-bit, we only have 512-bit messages\\
+What are the 2560 bits of $W_{0,\ldots,79}$?
+\begin{enumerate}
+\item $W_{0,\ldots,15} = M_{0,\ldots,15}$ (512 bits of $M$) 
+\item $W_i = (W_{i-3} \oplus W_{i-8} \oplus W_{i-14} \oplus W_{i-16})^{\circlearrowleft 1}$, $16 \leq i < 80$
+\end{enumerate}
+
+\smallskip
+
+Note: SHA-0 is \textbf{exactly} like SHA-1, except for:
+\begin{itemize}
+\item $W_i = W_{i-3} \oplus W_{i-8} \oplus W_{i-14} \oplus W_{i-16}$, $16 \leq i < 80$
+\end{itemize}
+
+And yet...
+\begin{itemize}
+\item First (theoretical) collision attack:
+\begin{itemize}
+\item SHA-0 $\rightsquigarrow$ 1998
+\item SHA-1 $\rightsquigarrow$ 2005
+\end{itemize}
+\item Fastest (actual) collision computation:
+\begin{itemize}
+\item SHA-0 $\rightsquigarrow$ 1 hour on a desktop PC (Manuel and Peyrin, 2008)
+\item SHA-1 $\rightsquigarrow$ 110 year on a GPU (Stevens \etal, 2017)
+\end{itemize}
+\end{itemize}
+\end{frame}
+
+\begin{frame}{And now for something different}
+If you need a hash function today $\Rightarrow$ SHA-3 (initially Keccak, (Bertoni \etal, 2008))
+\begin{itemize}
+\item Winner of an academic competition run by NIST (2008--2012)
+\end{itemize}
+\begin{itemize}
+\item Sponge construction (not Merkle-Damgaard)
+\item Based on a permutation (not a compression function)
+\item Permutation is an SPN (not a Feistel, not ARX)
+\end{itemize}
+
+Sponge:
+\begin{enumerate}
+\item Compute $i \defas \perm(\perm(\ldots\perm(m_1||0^c)\oplus m_2||0^c)\ldots)$
+\item Output $\hash(m) \defas \lfloor i \rfloor_r || \lfloor \perm(i) \rfloor_r || \ldots || \lfloor \perm^n(i) \rfloor_r$
+\end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Picture of a sponge}
+\begin{center}
+\includegraphics[scale=0.7]{sponge2}
+\end{center}
+\url{https://www.iacr.org/authors/tikz/}
+\end{frame}
+
+\begin{frame}{Sponge nice features}
+\begin{itemize}
+\item Indifferentiable from a RO (same, as Wide-pipe MD) (Bertoni \etal, 2008)
+\item Quite flexible
+\begin{itemize}
+\item For fixed permutation size: speed/security tradeoff
+\end{itemize}
+\item Natively a XOF
+\item Can be extended to do (authenticated) encryption
+\item Simpler to design a permutation; less of a waste?
+\end{itemize}
+
+\begin{itemize}
+\item Close structure: JH construction, another SHA-3 competitor (Wu, 2008)
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Conclusion}
+\begin{itemize}
+\item Don't design crypto yourself!
+\begin{itemize}
+\item There is no generic way to design a hash function
+\item Every small detail counts (recall e.g. SHA-0, TEA)
+\end{itemize}
+\item Use SHA-3 (SHA-2 still okay)
+\item Don't trust ISO standards
+\item NEVER USE MD5/SHA-1
+\begin{itemize}
+\item Even if you only care about preimage attacks
+\end{itemize}
+\end{itemize}
+\end{frame}
+
+\end{document}

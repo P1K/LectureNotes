@@ -1,0 +1,99 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[english]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{fourier}
+\usepackage{yfonts}
+\usepackage[hmargin=3cm,vmargin=2.3cm]{geometry}
+
+
+\DeclareMathOperator\hash{\mathcal{H}}
+\DeclareMathOperator\E{\mathcal{E}}
+\DeclareMathOperator\comp{\textswab{f}}
+\DeclareMathOperator\cat{\mathrm{CAT}}
+\DeclareMathOperator\pmm{\mathrm{PM}}
+\DeclareMathOperator\smm{\mathrm{SM}}
+\DeclareMathOperator\sand{\mathrm{SANDWICH}}
+
+\title{Crypto Engineering (GBX9SY03)\\
+TD Hash functions}
+\date{2017-10-18}
+
+\begin{document}
+
+\maketitle{}
+
+\subsection*{Exercise 1: Multicollisions for Merkle-Damg\aa rd hash functions}
+In 2004, Joux showed a simple attack illustrating the fact that Merkle-Damg\aa rd hash functions were not ``ideal''. This attack consists in computing a collision on many
+(more than two) messages, i.e. finding $m_0$, $m_1$, $\ldots$, $m_q$ that all have the same hash, more efficiently than what is possible for a random oracle.
+
+\paragraph{Q. 1:} We assume that the expected number of collisions in the elements of two lists $L_0$ and $L_1$ of random $n$-bit elements is $\approx \#L_0\times\#L_1/2^n$.
+Assuming $\hash : \{0,1\}^* \rightarrow \{0,1\}^n$ is a random oracle, what is the expected complexity of finding an $r$-collision for $\hash$?\\
+{\footnotesize Hint: try to find the optimal balance in the list sizes for the case $r = 3$, and generalize the formula.}
+
+\paragraph{Q. 2:} \emph{In the following question, we can safely ignore padding issues.} Recall the structure of a Merkle-Damg\aa rd hash function
+$\hash : \{0,1\}^* \rightarrow \{0,1\}^n$ based on a compression function $\comp : \{0,1\}^n \times \{0,1\}^b \rightarrow \{0,1\}^n$.
+Let $m$, $m'$ be two messages such that $|m| = |m'| = b$.
+Explicit the relation between $\hash(m)$, $\hash(m||m')$ and $\comp$.
+
+\paragraph{Q. 3} Take $\hash$ as in Q.~2. Let $m_0$ and $m'_0$ be two one-block messages colliding through $\hash$ (i.e. $h_0 :=
+\hash(m_0) = \comp(\text{IV}, m_0) = \hash(m'_0) = \comp(\text{IV}, m'_0)$). Assuming $\comp$ is ideal, how efficiently can you compute a collision
+($m_1$, $m'_1$) for $\comp(h_0, \cdot)$? Onece you have such a collision, how many messages colliding with $\hash(m_0||m_1)$ can you easily (i.e. in
+constant time) create? Conclude about the cost of
+computing a $2^r$-collision for $\hash$ and why Merkle-Damg\aa rd hash functions are not ideal.
+
+\paragraph{Q. 4} The \emph{concatenation combiner} is a simple construction taking two hash functions $\hash_1$ and $\hash_2$ and defined as
+$\cat_{\hash_1,\hash_2}(m) := \hash_1(m)||\hash_2(m)$. Assuming $\hash_1$ and $\hash_2$ have an output size of $n$ bits and follow the Merkle-Damg\aa rd construction,
+how efficiently can you compute a collision for $\cat_{\hash_1, \hash_2}$? Is it possible to significantly improve the collision-resistance of SHA-1 by using
+$\cat_{\text{SHA-1}, \text{MD5}}$?
+
+
+\subsection*{Exercise 2: Davies-Meyer fixed-points}
+In this exercise, we will see one reason why \emph{Merkle-Damg\aa rd strengthening} (adding the length of a message in its padding) is necessary
+in some practical constructions.
+
+\paragraph{Q. 1} Recall the ``Davies-Meyer'' construction of a compression function $\comp$ from a block cipher $\E$.
+
+\paragraph{Q. 2} By studying the feed-forward structure of Davies-Meyer, under what conditions would you obtain a fixed-point for such a compression function?
+
+\paragraph{Q. 3} Show how to compute the (unique) fixed-point of $\comp(\cdot,m)$ for a fixed $m$. Given $h$, is it easy to find $m$ such that it is a fixed-point,
+if $\E$ is an ideal block cipher?
+
+\paragraph{Q. 4} Conclude on the usefulness of strengthening when using Davies-Meyer + Merkle-Damg\aa rd.
+
+\paragraph{Note:} Fixed-points of the compression function can be useful to create the \emph{expandable messages} used in second preimage attacks on Merkle-Damg\aa rd.
+
+
+\subsection*{Exercise 3: Meet-in-the-middle preimage attack on BRSS/PGV-13 + MD}
+BRSS/PGV-13 is an alternative to Davies-Meyer, defined as $\comp(h,m) = \E(m,h) \oplus c$, with $c$ a constant. It can be shown in the ideal cipher model that
+a Merkle-Damg\aa rd function with such a compression function is secure up to the birthday bound for both collision \emph{and} preimage attacks (Black \& al., 2010).
+
+\paragraph{Q. 1} If $\E$ is ideal, what is the complexity, given $h$ and $t$, of finding $m$ such that $\comp(h, m) = t$? Conclude about the preimage security
+of $\comp$ itself.
+
+\paragraph{Q. 2} Show how to compute a two-block preimage for $\hash$ with the above compression function, using a
+meet-in-the-middle attack, and roughly evaluate its complexity (both time and memory).
+
+\paragraph{Q. 3} Give a rough explanation of how the attack of Q.~2 is prevented when using a Davies-Meyer compression function.
+
+\subsection*{Exercise 4: Hash-based message-authentication codes}
+
+\paragraph{Q. 1} Recall the definition of a message-authentication code (MAC), existential forgery, and universal forgery,
+and the expected resistance of a secure MAC against such notions.
+
+\paragraph{Q. 2} Let us first assume that $\hash$ is a random oracle. Explain (roughly) why the ``prefix-MAC'' construction
+$\pmm_{\hash}(k, m) := \hash(k||m)$ is secure? What about ``suffix-MAC'': $\smm_{\hash}(k, m) := \hash(m||k)$?
+
+\paragraph{Q. 3} Now assume that $\hash$ is a Merkle-Damg\aa rd hash function. Suppose I know $m$ and its tag $t := \pmm_{\hash}(k, m)$,
+and that the size of $k$ is known. How easily can I compute another message and its corresponding tag under $\pmm_{\hash}(k, \cdot)$? What is the security of
+this MAC against existential forgery?
+
+\paragraph{Q. 4} Still assuming that $\hash$ is a Merkle-Damg\aa rd function, show how collisions on $\hash$ lead to an existential forgery attack
+of $\smm_{\hash}$. What is the expected complexity of this attack for an otherwise secure $\hash$? 
+
+\paragraph{Q. 5} Is it reasonable to instantiate prefix/suffix-MAC with SHA-3? With SHA-256? With SHA-512/256?
+
+\paragraph{Note:} It can be proven (Yasuda, 2007) that, using appropriate padding rules, the ``Sandwich-MAC'' construction $\sand_{\hash}(k,m) := \hash(k||p||m||p'||k)$
+(where $p$ and $p'$ denote padding) is secure, without requiring $\hash$ to be a random oracle (in particular, it can be built with a Merkle-Damg\aa rd construction).
+
+\end{document}
