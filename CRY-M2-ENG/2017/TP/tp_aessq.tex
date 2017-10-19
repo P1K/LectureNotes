@@ -1,20 +1,29 @@
 \documentclass[a4paper,11pt]{article}
 \usepackage[english]{babel}
 \usepackage[utf8]{inputenc}
-\usepackage{amsmath}
 \usepackage{fourier}
+\usepackage{amsmath}
 \usepackage{yfonts}
 \usepackage[hmargin=3cm,vmargin=3cm]{geometry}
 \usepackage{units}
 \usepackage{graphicx}
 \usepackage[colorlinks=true]{hyperref}
+\usepackage{fancyhdr}
 
 \renewcommand{\thefootnote}{\fnsymbol{footnote}}
+\renewcommand{\labelitemi}{\starredbullet}
 
-\DeclareMathOperator\sub{\textgoth{S}}
-\DeclareMathOperator\mc{\textgoth{M}}
-\DeclareMathOperator\prf{PRF}
-\DeclareMathOperator\prp{PRP}
+\pagestyle{fancy}
+\fancyhead{}
+\fancyhead[L]{\href{https://www-ljk.imag.fr/membres/Pierre.Karpman/cry\_eng2017\_tp\_aessq.pdf}{https://www-ljk.imag.fr/membres/Pierre.Karpman/cry\_eng2017\_tp\_aessq.pdf}}
+
+
+\DeclareMathOperator\sub{S}
+\newcommand\mc{M}
+\DeclareMathOperator\prf{\mathcal{F}}
+\DeclareMathOperator\prp{\mathcal{E}}
+\DeclareMathOperator\AES{AES}
+
 
 \title{Crypto Engineering (GBX9SY03)\\
 TP --- Square attack on $3\nicefrac{1}{2}$ rounds of AES}
@@ -23,6 +32,17 @@ TP --- Square attack on $3\nicefrac{1}{2}$ rounds of AES}
 \begin{document}
 
 \maketitle{}
+
+\section*{Grading}
+This TP is graded as part of the \emph{contrôle continu}. You must send a written report (in a portable format) detailing
+your answers to the questions, and the corresponding source code (with compilation and execution instructions)
+by Friday next week (2017-10-27T23:59+0200) to:\\
+\begin{center}
+\href{mailto:pierre.karpman@univ-grenoble-alpes.fr}{pierre.karpman@univ-grenoble-alpes.fr}.
+\end{center}
+Working in teams of two is allowed (but not mandatory), in which case only one report needs to be sent, with the name of both
+students clearly mentioned. 
+
 
 \section*{Introduction}
 
@@ -33,9 +53,15 @@ of the AES (Daemen \& al., 1997), and later generalized to even wider settings (
 
 The attack, like many others in symmetric-key cryptography, is based on a \emph{distinguisher}, i.e. a property that allows to decide if
 one is interacting with a specific algorithm (e.g. the AES) or a ``random'' one (e.g. a random permutation). In our case, the distinguisher
-works on $3$ rounds of the AES, and we will use it to recover the key for $3\nicefrac{1}{2}$ rounds. The idea to do so is the following:
+works on $3$ rounds of the AES and consists in the fact that for 256 well-chosen plaintexts $p_{0},\ldots,p_{255}$,
+we have that $\AES_3(p_0) \oplus \ldots \oplus \AES_3(p_{255}) = 0$, i.e. the XOR of the 256 ciphertexts encrypted by 3-round AES is the all-zero value.
+As this property is unlikely to hold for a random permutation, we can use it to distinguish.
+
+We will use this distinguisher to recover the key for $3\nicefrac{1}{2}$ rounds of AES (a $\nicefrac{1}{2}$ round is a round
+without MixColumn, cf. below). The idea to do so is the following:
 \begin{enumerate}
-\item Make queries to the $3\nicefrac{1}{2}$ oracle that would allow to observe the distinguisher (on $3$ rounds).
+\item Make queries to the $3\nicefrac{1}{2}$ oracle that would allow to observe the distinguisher (on $3$ rounds), i.e. query $\AES_{3\nicefrac{1}{2}}$
+with an unknown key on $p_0, \ldots, p_{255}$ as above.
 \item Partially decrypt the oracle answers by $\nicefrac{1}{2}$ rounds, by making a guess on part of the key.
 \item If the guess allows to observe the distinguisher on the partially decrypted ciphertexts, it is assumed to be correct; otherwise another one is made.
 \end{enumerate}
@@ -44,26 +70,40 @@ works on $3$ rounds of the AES, and we will use it to recover the key for $3\nic
 
 Recall that the AES round function is the composition of four functions: AddRoundKey (ARK), SubBytes (SB), ShiftRows (SR) and MixColumns (MC).
 The last round omits the
-MixColumn function and will be counted as a $\nicefrac{1}{2}$-round.
-The property which we exploit in the distinguisher derives from the fact that XORing all the $2^n$ $n$-bit values results in $0$. 
+MixColumn function and will be counted as a $\nicefrac{1}{2}$-round (however, this last round \emph{does} include an extra ARK at the very end.
+It can thus be written as ARK $\circ$ SR $\circ$ SB $\circ$ ARK).
+The property which we exploit in the distinguisher derives from the fact that XORing all the $2^n$ $n$-bit values $0, 1, \ldots, 2^{n}-1$ results in $0$. 
 In more details, we use the following facts:
 \begin{enumerate}
 \item We call $\lambda$ the set $\{\texttt{0x00}, \ldots, \texttt{0xFF}\}$ of all 8-bit values from 0 to 255.
-As the AES S-box $\sub$ is a permutation, we have that $\bigoplus_{x \in \lambda} \sub(x) = \bigoplus_{x \in \lambda} x = 0$.
-\item We consider a set $\lambda'$ of 256 vectors of $\mathbb{F}_{2^8}^4$ for which one (w.l.o.g. the first) coordinate takes all possible values,
-and the three others are constant. We write such a set as $(\star, c, c, c)^t$. As the MixColumn matrix $\mc$ of the AES
-does not have any zero coefficient, each coordinate of the elements of the set $\{\mc\cdot x,~x \in \lambda'\}$ takes all possible values
-across the set, i.e. the output set is of the form $(\star, \star, \star, \star)^t$.
-\item We consider a set $\lambda''$ of 256 vectors of $\mathbb{F}_{2^8}^4$ of the form $(\star, \star, \star, \star)^t$. For any matrix
-$A = (a_{i,j})$ of $\mathcal{M}_{4}(\mathbb{F}_{2^8})$ (and thence for $\mc$ in particular), the sum of all elements of $\{A\cdot x,~x \in \lambda''\}$
-is the all-zero vector. Indeed, the sum of any of the four coordinates is of the form:
+If $\sub$ is a permutation, we have that $\bigoplus_{x \in \lambda} \sub(x) = \bigoplus_{x \in \lambda} x = 0$.
+\item We consider a set $\lambda'$ of 256 vectors of $\mathbf{F}_{2^8}^4$ for which one (w.l.o.g. the first) coordinate takes all possible values,
+and the three others are constant. We write such a set as $(\star, c, c, c)^t$; that is, a coordinate marked $c$ takes the same value in all 256 elements
+of $\lambda'$, and one marked $\star$ takes each possible value of $\mathbf{F}_{2^8}$ \emph{exactly once}. Note that the three positions marked $c$
+do not have to take the \emph{same} constant value.
+An example of a set having the property $(\star, c, c, c)^t$ is $\{(i, 0, 1, 2)^t, i \in \mathbf{F}_{2^8}\}$ 
+
+Now, as the MixColumn matrix $\mc$ of the AES
+does not have any zero coefficient, each coordinate of the elements of the set $\{\mc\cdot x,~x \in \lambda'\}$ takes each possible value
+of $\mathbf{F}_{2^8}$ exactly once, 
+i.e. the output set is of the form $(\star, \star, \star, \star)^t$.
+Note that as for the ``$c$'' notation above, there is no requirement that all four coordinates of the vectors of this output set be the same.
+For instance, the set $\{(0, 0, 0, 0)^t\} \cup \{(\alpha^i, \alpha^{i+1}, \alpha^{i+2}, \alpha^{i+3})^t, i = 0,\ldots,254\}$ for $\alpha$
+a generator of $\mathbf{F}_{2^8}^*$ is of the form $(\star, \star, \star, \star)^t$. 
+
+
+\item We consider a set $\lambda''$ of 256 vectors of $\mathbf{F}_{2^8}^4$ of the form $(\star, \star, \star, \star)^t$. For any matrix
+$A = (a_{i,j})$ of $\mathcal{M}_{4}(\mathbf{F}_{2^8})$ (and thence for $\mc$ in particular), the sum of all elements of $\mathcal{B} := \{A\cdot x,~x \in \lambda''\}$
+is the all-zero vector. Indeed, for any of the four coordinates $i$, the sum across all elements of $\mathcal{B}$ can be rewritten as:
 \[
 \bigoplus_{x \in \lambda} a_{i,0} x \oplus \bigoplus_{x \in \lambda} a_{i,1} x \oplus \bigoplus_{x \in \lambda} a_{i,2} x \oplus \bigoplus_{x \in \lambda} a_{i,3} x,
 \]
-with all $a_{i,j}$s either zero or invertible, hence the above is equal to $0 \oplus 0 \oplus 0 \oplus 0$. We write such an output set as $(\flat, \flat, \flat, \flat)^t$.
+with all $a_{i,j}$s either zero or invertible, hence the above is equal to $0 \oplus 0 \oplus 0 \oplus 0$. We write this property of the output
+set $\mathcal{B}$ as $(\flat, \flat, \flat, \flat)^t$.
 \end{enumerate}
 
-We now define a $\Lambda$-set as a set of 256 16-byte plaintexts with one byte taking all possible values ($\star$), and the fifteen other being constant (in white).
+We now define a $\Lambda$-set as a set of 256 16-byte plaintexts with one byte taking all possible values ($\star$), and the fifteen other being constant ($c$,
+or in white in \autoref{fig:square3}).
 Thanks to the above facts, we can now graphically follow the propagation of a $\Lambda$-set over three rounds of the AES, in \autoref{fig:square3}\footnote{Figure slightly adapted from \href{https://www.iacr.org/authors/tikz/}{https://www.iacr.org/authors/tikz/}.}.
 
 \begin{figure}[!hbt]
@@ -75,30 +115,44 @@ Thanks to the above facts, we can now graphically follow the propagation of a $\
 In words, the sum after 3 rounds of AES of all the 256 ciphertexts whose corresponding plaintexts form a $\Lambda$-set is zero.
 
 
-\section*{Exercice 1: Warming up with PRPs and PRFs}
+\section*{Exercice 1: Warming up}
 
-The PRP-PRF switching lemma is an important theoretical result that roughly says that up to the birthday bound, a pseudorandom permutation
-behaves as a pseudorandom function (it formalizes the intuition that the only thing distinguishing a random function from a random permutation
-is the absence of collisions in the latter's outputs). As many constructions or modes of operations (such as CBC or CTR) are secure when instantiated
-by a function but not by a permutation (for a concrete analysis, see e.g. McGrew, 2013),
-the problem of designing ``beyond the birthday bound'' PRFs from PRPs is a recurrent topic in cryptography.
-A well-known construction of such a ``fully secure'' PRF is the \emph{XOR of PRP} construction (Bellare \& al., 1998; Lucks, 2000; and many others):
-define $\prf(k_1||k_2, x)$ as $\prp(k_1, x) \oplus \prp(k_2, x)$.
+Download the AES standard at
+\begin{center}
+\href{https://csrc.nist.gov/csrc/media/publications/fips/197/final/documents/fips-197.pdf}{https://csrc.nist.gov/csrc/media/publications/fips/197/final/documents/fips-197.pdf}
+\end{center}
+and the tarball
+\begin{center}
+ \href{https://www-ljk.imag.fr/membres/Pierre.Karpman/cry\_eng2017\_tp\_aessq.tar.bz2}{https://www-ljk.imag.fr/membres/Pierre.Karpman/cry\_eng2017\_tp\_aessq.tar.bz2}
+\end{center}
 
-\paragraph*{Q. 1} Using the provided AES functions, instantiate the XOR of PRP construction by using AES reduced to three (full) rounds for the PRP.
+\paragraph*{Q. 1} \emph{This question is largely independent of the others.}
+Explain the role of the function \texttt{xtime} in the file \texttt{aes-128\_enc.c}, and show that it is correct.
+Write your own variant of \texttt{xtime} for a different representation of $\mathbf{F}_{2^8}$ (note that
+$X^8 + X^6 + X^5 + X^4 + X^3 + X + 1$ is irreducible over $\mathbf{F}_2[X]$).
 
-\paragraph*{Q. 2} Show that it is not secure by implementing an efficient square/saturation/integral distinguisher.
+\paragraph*{Q. 2} Implement the functions \texttt{next\_aes128\_round\_key} and \texttt{prev\_aes128\_round\_key}. Verify the correctness of
+your implementation by using the test values provided in the standard document.
+
+\bigskip
+
+A good way to build a keyed function $\prf$ from a block cipher $\prp$ is to define $\prf(k_1||k_2, x)$ as $\prp(k_1, x) \oplus \prp(k_2, x)$
+(see Bellare \& al., 1998; Lucks, 2000; and many others).
+Such a keyed function may then for instance be used to encrypt in CTR mode, or as the basis of a MAC.
+
+\smallskip
+
+\paragraph*{Q. 3} Implement the above construction with three (full) rounds of AES for $\prp$. Show that the 3-round square distinguisher
+for such an $\prp$ also works for the corresponding $\prf$, and write a test program to confirm this. 
 
 \section*{Exercice 2: Key-recovery attack for $3\nicefrac{1}{2}$-round AES}
 
 Implement a key-recovery attack for $3\nicefrac{1}{2}$-round AES (i.e. four rounds, with the last one omitting the MixColumn), using the square distinguisher.
 The steps to do so are the following.
 
-\paragraph*{Q. 1} Implement $3\nicefrac{1}{2}$-round AES.
+\paragraph*{Q. 1} Implement the partial decryption by $\nicefrac{1}{2}$ round of one state byte, given one byte of the key.
 
-\paragraph*{Q. 2} Implement the partial decryption by $\nicefrac{1}{2}$ round of one state byte, given one byte of the key.
-
-\paragraph*{Q. 3} Implement the entire attack, and test it on randomly generated keys (e.g. obtained from \texttt{/dev/urandom}). That is, query
+\paragraph*{Q. 2} Implement the entire attack, and test it on randomly generated keys (e.g. obtained from \texttt{/dev/urandom}). That is, query
 your reduced AES on a $\Lambda$-set and iteratively find each byte of the last round key. This can simply be done by guessing the value for each key
 byte separately and discarding wrong guesses by partially decrypting and checking the 3-round distinguisher. However, don't forget to:
 \begin{itemize}
@@ -106,7 +160,12 @@ byte separately and discarding wrong guesses by partially decrypting and checkin
 \item Invert the key expansion to recover the original master key.
 \end{itemize} 
 
+\paragraph*{Q. 3} Check that changing the representation of $\mathbf{F}_{2^8}$ as in (Exercice 1, Q. 1) leads to a different cipher, but that the
+attack still works. Check the same when changing the S-box used in SubBytes and/or the MDS matrix used in MixColumn.
 
+\paragraph*{Note:} The 3-round distinguisher shown in this exercice can be used in a key-recovery attack up to 6 rounds of AES-128, still exploiting
+the same kind of process (see Ferguson \& al. (2000) for the original attack and Todo \& Aoki (2014) for an alternative using FFT techniques).
+The complexity of this 6-round attack is about $2^{32}$ chosen plaintexts and $2^{50}$ encryptions, which is expensive but manageable in practice.
 
 
 \end{document}
