@@ -133,6 +133,7 @@ $X^8 + X^6 + X^5 + X^4 + X^3 + X + 1$ is irreducible over $\mathbf{F}_2[X]$).
 
 \paragraph*{Q. 2} Implement the functions \texttt{next\_aes128\_round\_key} and \texttt{prev\_aes128\_round\_key}. Verify the correctness of
 your implementation by using the test values provided in the standard document.
+% TODO next year: just ask prev_round_key
 
 \bigskip
 
@@ -142,7 +143,9 @@ Such a keyed function may then for instance be used to encrypt in CTR mode, or a
 
 \smallskip
 
-\paragraph*{Q. 3} Implement the above construction with three (full) rounds of AES for $\prp$. Show that the 3-round square distinguisher
+\paragraph*{Q. 3} Implement the above construction with three (full) rounds of AES for $\prp$. Why do you need to take $k_1 \neq k_2$ for
+$\prf$ not to be trivial?
+Show that the 3-round square distinguisher
 for such an $\prp$ also works for the corresponding $\prf$, and write a test program to confirm this. 
 
 \section*{Exercice 2: Key-recovery attack for $3\nicefrac{1}{2}$-round AES}

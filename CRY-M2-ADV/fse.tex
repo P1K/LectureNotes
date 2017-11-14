@@ -1,0 +1,392 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[english]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{fourier}
+\usepackage{yfonts}
+\usepackage[hmargin=3cm,vmargin=2.4cm]{geometry}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+
+\hypersetup{
+  colorlinks=true,
+  citecolor=NavyBlue,
+  linkcolor=BrickRed,
+  urlcolor=Violet
+}
+
+\pagestyle{fancy}
+\fancyhead{}
+\fancyhead[L]{\href{https://www-ljk.imag.fr/membres/Pierre.Karpman/cry\_adv2017\_fse1.pdf}{https://www-ljk.imag.fr/membres/Pierre.Karpman/cry\_adv2017\_fse1.pdf}}
+
+\theoremstyle{definition}
+\newtheorem{defi}{Definition}
+\def\defiautorefname{Definition}
+
+
+\DeclareMathOperator\E{\mathcal{E}}
+\DeclareMathOperator\TE{\mathcal{\widetilde{E}}}
+\DeclareMathOperator\Perm{\mathcal{P}}
+\DeclareMathOperator\ora{\mathcal{O}}
+\DeclareMathOperator\iE{\textswab{E}}
+\DeclareMathOperator\iPerm{\textswab{P}}
+\DeclareMathOperator\Adv{\mathbf{Adv}}
+\DeclareMathOperator\aes{AES-128}
+\DeclareMathOperator\bigo{\mathit{O}}
+\DeclareMathOperator\rkf{\varphi}
+\newcommand\ks{\mathcal{K}}
+\newcommand\ms{\mathcal{M}}
+\newcommand\cs{\mathcal{C}}
+\newcommand\msb{\{0,1\}^n}
+\newcommand\ksb{\{0,1\}^\kappa}
+\newcommand\tsb{\{0,1\}^\theta}
+\newcommand\allperms{\Pi_n}
+\newcommand\allpermfams{\Pi_n^\kappa}
+\newcommand\randraw{\xleftarrow{{\scriptscriptstyle\$}}}
+
+\title{Advanced cryptology (GBX9SY06)\\
+\decosix\\
+Block ciphers}
+\date{2017-11}
+\author{Pierre Karpman}
+
+\begin{document}
+
+\maketitle{}
+
+\section{First definitions}
+
+A block cipher is a family of invertible mappings indexed by a key: $\E : \ks \times \ms \rightarrow \cs$, where both $\E$ and its inverse
+$\E^{-1}$ are ``efficiently computable''\footnote{As concrete block ciphers (usually) fix all their parameters, there is not much sense to argue about this
+efficiency in terms of asymptotic complexity, and we will not attempt to give a precise definition of what ``efficient'' means in this context.}.
+In practice, we only care about ciphers for which $\ms = \cs$, meaning that $\E$ defines a family
+of \emph{permutations} over $\ms$. In the vast majority of cases, we also have $\ms = \{0,1\}^n$ for some integer $n$, often equal
+to 64 or 128 (though smaller, larger, and intermediate values are possible). In some corner cases, however, it may be that $\ms$
+has a different structure, for instance all integers smaller than a certain $N$, or the set of valid credit-card numbers. This is the
+concern of \emph{format-preserving encryption}, which will not be addressed in this course. Note that as long as cryptography
+is implemented on digital circuits, there is no similar incentive to take $\ks$ of another form than $\{0,1\}^\kappa$. To summarize,
+we will use the following definition.
+
+\begin{defi}[Block ciphers]
+\label{def:bc}
+A block cipher is a family of mappings $\E : \ksb \times \msb \rightarrow \msb$ such that for all $k \in \ksb$, $\E(k,\cdot)$ is a permutation.
+The quantities $n$ and $\kappa$ are positive integers, called the block size (or length) and key size, respectively.
+\end{defi}
+
+Block ciphers are important \emph{primitives} in symmetric-key cryptography. When used with a suitable \emph{mode of operation},
+they allow to ensure the confidentiality and authenticity of data. We will not address the issue of modes in this course, but it
+is important to remember that they are essential; without a proper mode, a block cipher is mostly useless.
+
+There are many constructions that satisfy \autoref{def:bc}, but not all of them are useful in a cryptographic context. For instance,
+$\E$ such that for all $k$ the mapping $\E(k,\cdot)$ is the identity is not terribly good at providing confidentiality. We thus need to express one
+or several security properties that should hold for a ``good'' block cipher. Intuitively and informally, we typically require that:
+\begin{enumerate}
+\item Given $x_0, \ldots, x_m, \E(k,x_0), \ldots, \E(k,x_m)$, it should be ``hard'' to find $k$, even if the $x_i$s span the entire
+message space $\msb$. An attack violating this property is called a \emph{key-recovery attack}\footnote{More generally, we may
+require that it should be hard to recover $k'$ s.t. $\E(k,\cdot) = \E(k',\cdot)$ on most inputs.}.
+\item Given $x_0, \ldots, x_m, \E(k,x_0), \ldots, \E(k,x_m)$ and $y_0$ (resp. $\E(k,y_0)$), it should be ``hard'' to learn information about
+$\E(k, y_0)$ (resp. $y_0$) (except that it is distinct from the $\E(k, x_i)$s (resp. $x_i$s)). An attack violating this property is usually called a \emph{distinguishing}
+attack.
+\end{enumerate}
+The first of these informal properties is maybe the most obvious one to think of, but it is not sufficient in itself to capture all the
+desired properties of a block cipher. For instance, one may consider a cipher $\E$ for which key-recovery attacks are hard, but such that for all
+$k$, $\E(k,m) = m$ whenever $m$ starts with a zero bit. It is quite clear that such an $\E$ does not provide adequate confidentiality.
+
+In order to be more precise about our requirements for
+good block ciphers, it is useful to first consider \emph{ideal} block ciphers. This allows to set a standard for any
+security property we might be interested in, as these should be ``maximally hard'' for an ideal cipher. A
+concrete (non-ideal) cipher $\E$ is then considered to be secure if it is hard to decide if one is interacting
+with $\E$ or with an optimally-secure ideal cipher.
+
+The definition of an ideal cipher is quite simple: it is simply a block cipher $\iE$ such that for all $k$, $\iE(k,\cdot)$ is
+a permutation uniformly drawn at random among all permutations over the same domain. Thus, all keys of $\iE$ define
+completely independent mappings that are all equally likely to be selected. Fixing the notation, we have the following definition.
+
+\begin{defi}[Ideal block cipher]
+\label{def:ic}
+Let $\allperms$ denote the set of all $2^n!$ permutations over $\msb$. For any finite set $\mathcal{S}$, we write $x \randraw \mathcal{S}$
+the uniform sampling of $x$ over all elements of $\mathcal{S}$. Then, an ideal block cipher is a cipher
+$\iE : \ksb \times \msb \rightarrow \msb$ such that for all $k \in \ksb$, $\iE(k,\cdot) \randraw \allperms$.
+\end{defi}
+
+Note that not all ideal ciphers are in fact secure. For instance, when randomly sampling an ideal cipher,
+there is a $1/(2^n!\times 2^\kappa)$ chance that $\iE$ be defined as the insecure identity-everywhere cipher. However, we claim
+that the odds of picking an ``insecure'' cipher are small enough for this eventuality to be ignored altogether.
+
+As already said above, one may use the notion of an ideal cipher to define the security of a concrete one by how easy it is for
+an adversary to decide if he is interacting with an ideal cipher or not. This corresponds to the notion of
+\emph{pseudorandom permutation} (PRP). Informally, this notion is expressed by having an adversary
+interacting with an \emph{oracle} $\ora$ which is randomly chosen to be either of $\E(K,\cdot)$ or $\iE(K, \cdot)$
+for a random key $K$ (as $\iE$ is ideal, the latter case is simplified by dropping the key and simply
+asking that $\iE$ be a uniformly chosen permutation). Then one considers what is the best \emph{advantage} over a
+random choice that an adversary has of deciding how $\ora$ was instantiated.
+
+It seems clear that the advantage should in fact be a function of the \emph{data complexity} (the number of queries to
+$\ora$) and of the \emph{time complexity} (where the unit is generally the time it takes to evaluate $\E$) of the adversary.
+For instance, this accounts for the fact that any cipher (even an ideal one) of key size $\kappa$ can be broken by exhaustive key search
+in time $2^\kappa$, and yet could still be secure if the adversary only has more limited resources.
+We then define the PRP security of $\E$ through the following PRP advantage function (see e.g.~\cite{DBLP:journals/jcss/BellareKR00,bellare-rogaway_course}).
+
+\begin{defi}[PRP advantage]
+\label{def:prp}
+The \emph{PRP advantage}  of $\E : \ksb \times \msb \rightarrow \msb$ is defined as:
+\[
+\Adv^\text{PRP}_{\E}(q,t) := \max_{A_{q,t}} \left|\Pr\left[A^{\ora}_{q,t}(\cdot) = 1 : \ora \randraw \allperms\right] -
+\Pr\left[A^{\ora}_{q,t}(\cdot) = 1 : \ora = \E(K,\cdot), K \randraw \ksb\right]\right|,
+\]
+where $A^{\ora}_{q,t}$ denotes an adversary $A$ who makes at most $q$ queries to its oracle $\ora$, runs in time at most $t$, and returns a unique bit.
+
+A similar notion of \emph{strong} PRP (SPRP) can be defined, where the adversary is additionally granted access to the inverse of $\ora$.
+\end{defi}
+
+
+Now we can use \autoref{def:prp} to formulate some requirements about the security of a ``good'' block cipher $\E$. As, we would
+ideally want $\E$ to behave as close as possible to an ideal cipher $\iE$ (defined over the same domains), i.e. we wish that
+$\Adv^\text{PRP}_{\E}(q,t) \approx \Adv^\text{PRP}_{\iE}(q,t)$ for all $q$, $t$ (for instance, we would like to
+have $\Adv^\text{PRP}_{\E}(1,t) \approx t/2^\kappa$). By abuse of terminology, we usually say of such an
+hypothetical cipher that ``it is a PRP''.
+
+Note that breaking PRP security does not even require to recover the key $k$ when $\ora = \E(k,\cdot)$, which was one of the informal
+goals stated at the beginning of this section. As recovering the key \emph{does} however allow to break PRP security, focusing only
+on the latter does not weaken the requirements on $\E$, and allows to capture the second informal goal of resisting distinguishing
+attacks.
+
+The notion of PRP is useful to express desirable properties for concrete block ciphers. However, it is in itself useless to actually
+evaluate their security. That it is to say, the definition provides very little insight into how to compute e.g. $\Adv^\text{PRP}_{\aes}$.
+It is in fact the goal of cryptanalysis in general, by finding explicit attacks, to lower-bound the advantage function for specific ciphers
+and complexities.
+
+% Exercice: PRP-security of 3-round AES
+
+\section{An ideal construction}
+
+We now present a generic construction of block ciphers due to Even and Mansour~\cite{DBLP:conf/asiacrypt/EvenM91,DBLP:journals/joc/EvenM97}, which is very simple yet of considerable interest.
+Let $\Perm : \msb \rightarrow \msb$ be a ``public'' (i.e. not secret) permutation, then one simply defines the
+Even-Mansour cipher built from $\Perm$ as $\E(k_1||k_2,m) := \Perm(m \oplus k_1) \oplus k_2$, for all keys $(k_1||k_2)$
+of $2n$ bits and all messages $m$. In fact, we can also go for an even simpler definition by taking $k_1 = k_2$, thence
+obtaining $\E(k, m) = \Perm(m \oplus k) \oplus k$. What is remarkable is that both of these constructions can be proven
+to be  good PRPs, assuming that $\Perm$ is itself a ``good'' permutation. Intuitively, this implies for instance
+that $\Perm$ should not admit efficient distinguishers, in line with our second intuitive requirement for a block cipher.
+However, this is not an easy notion to formalize; the approach taken by Even and Mansour to prove their construction
+is then to only allow an adversary to make black-box oracle queries to $\Perm$. A possible interpretation
+is then to consider this number of queries
+itself to denote the ``time complexity'' of the attack.
+
+\subsection{Proof sketch}
+
+The security theorem proved by Even and Mansour does not use the notion of PRP, which was not formalised at the time. Instead,
+it proves that the success probability of an adversary for the \emph{existential forgery problem} (EFP) is upper-bounded by
+$\bigo(DT/2^n)$, where $D$ is the number of queries to $\E$ or its inverse (with an unknown fixed random key) and $T$
+the number of black-box queries to $\Perm$ or its inverse. In other words, the scheme achieves security up to the birthday bound.
+Note however that the proof can be adapted to a PRP setting, but we will rather focus on the original formulation.
+
+The EFP attack considered here does the following: the adversary is first given access to $\E(k, \cdot)$, $\E^{-1}(k, \cdot)$, $\Perm$ and $\Perm^{-1}$
+to make any query he wants;
+then, he must provide a pair $(p, c)$ such that $\E(k,p) = c$, and neither $p$ nor $c$ was queried for the $\E$ or $\E^{-1}$ oracle respectively.
+One can show without much trouble that this attack is not easier than decrypting a challenge ciphertext without knowing the key, or more generally recovering an unknown key.
+
+We now briefly sketch the proof. The idea is to keep track of all queries made by the adversary and to count the number of possible \emph{bad} keys. These are the keys
+whose consistency with $\Perm$ and $\E$ was ``checked''. After the last query is made, if the actual key is marked as bad, we assume that the adversary
+won. Otherwise, one can show that all \emph{good} (i.e. not bad) keys have the same probability of being the actual key, and their number determines the
+success probability of the adversary.
+More precisely:
+\begin{itemize}
+\item A key $k$ is \emph{bad} if the adversary made a query relating $x$ and $y$ through $\Perm$ (i.e. queried $\Perm$ on $x$ or $\Perm^{-1}$ on $y$)
+and a query relating $x'$ and $y'$ through $\E$ such that at least one of $x \oplus x'$ and $y \oplus y'$ is equal to $k$.
+Indeed, if $k$ were the correct key used in $\E$, we would have $y' = \E(k,x') = \Perm(x' \oplus k) \oplus k$, so $x = x' \oplus k \Leftrightarrow y' = y \oplus k$,
+which is a property that can easily be checked from the queries.
+\item A key is \emph{good} if it is not bad.
+\end{itemize}
+One can then see that the number of bad keys is at most approximately equal to the number of queries to $\Perm$ times the number of queries to $\E$,
+and the theorem mostly follows.
+
+\subsection{Generic attacks}
+
+An important and common question that arises in the context of security proofs such as the one above is the question of \emph{tightness}.
+That is, we are interested in knowing if the actual security of a construction might be better than what the proof provides, or if there
+exists an attack with a complexity matching the provable bound.
+Ideally, we would like all proofs to be tight. If the status of a proof is not known, it is a natural research problem to either find an attack
+matching the bound of the proof or a better proof matching less efficient attacks.
+
+In the case of the Even-Mansour construction, it was quickly found out by Daemen that the proof is indeed tight~\cite{DBLP:conf/asiacrypt/Daemen91}. In fact, it is quite
+straightforward to extract an ``optimal'' attack strategy from the proof sketch as given above. Several variants of what is generically
+called \emph{slide attacks} exist (see e.g.~\cite{DBLP:conf/eurocrypt/DunkelmanKS12}), and we sketch two of them. The first one works as follows:
+\begin{enumerate}
+\item Pick $N$ distinct random values $x_i$, query $\E(x_i)$ and $\Perm(x_i)$, and insert their sums $y_i := \E(x_i) \oplus \Perm(x_i)$ along
+with $x_i$ in a table.
+\item For all $i$, $j$ such that $y_i = y_j$, return $x_i \oplus x_j$ as a key candidate.
+\end{enumerate}
+First, let us show that if the unknown key $k$ is equal to $x_i \oplus x_j$ for some $(i,j)$, the test in step 2) will indeed return $k$ as a candidate. This
+is straightforward, as by definition we have:
+\[
+y_i = \Perm(x_i \oplus k) \oplus k \oplus \Perm(x_i) = \Perm(x_j) \oplus k \oplus \Perm(x_j \oplus k) = y_j.
+\]
+Now what is the probability (in function of $N$) that this event happens? As the $x_i$s are chosen randomly, their differences form
+$N\cdot(N-1)/2$ (non-necessarily distinct) random values, hence the probability that one of these is equal to
+$k$ is roughly $N^2/2^n$. This already matches the bound of the security proof, however, we can go further and show
+that the attack can still be efficiently implemented if one additionally considers its time\footnote{We referred to the black-box queries
+to $\Perm$ as the ``time complexity''. While it is indeed reasonable to consider this as a \emph{lower-bound} on the time complexity
+of an attack that does not exploit structural properties of $\Perm$, an actual attack algorithm such as the one above might
+imply additional processing beyond computations of $\Perm$.}   and memory complexity (which
+are not accounted for in the theorem).
+First, by using a suitable data structure (e.g. a hash table), one only needs $\bigo(N)$ memory to store
+the $N$ $(x_i, y_i)$ pairs, and every collision can be detected in constant time. Thus, we only need to look at the expected
+number of collisions and show that it is not more than $N$. If we make the reasonable assumption
+that $x \mapsto \E(x) \oplus \Perm(x)$ behaves as a random function, then the expected number of collisions is $\bigo(N^2/2^n)$,
+which is much smaller than $N$ for $N \ll 2^n$. We thus only expect a few ``false positive'' suggestions for $k$ before finding
+the correct value and stopping the attack.
+Putting everything together, this attack has a time, memory, and data complexity of $N$, and a success probability upper-bounded
+by $\bigo(N^2/2^n)$.
+
+We only describe, and do not analyse the second attack. Unlike the first, it actually requires the keys $k_1$ and $k_2$ to be identical
+(the previous did not, even though it was presented in this simplified case), but it allows to trade queries to $\E$ for queries
+to $\Perm$. That is, it succeeds with probability upper-bounded by $DT/2^n$ with $D$ and $T$ free to take any value, whereas the previous
+attack required $D = T$. This attack works as follows:
+\begin{enumerate}
+\item Pick $D$ distinct random values $x_i$, query $\E(x_i)$, and insert $y_i := \E(x_i) \oplus x_i$ along with $x_i$ in a table.
+\item Pick $T$ distinct random values $x'_i$, query $\Perm(x'_i)$, and insert $y'_i := \Perm(x'_i) \oplus x'_i$ along with $x'_i$ in a table.
+\item For all $i$, $j$ such that $y_i = y'_j$, return $x_i \oplus x'_j$ as a key candidate.
+\end{enumerate}
+
+
+\subsection{Generalisations}
+
+There are several ways to generalise the Even-Mansour constructions, beyond the simple variant taking $k_1 = k_2$ that we already considered.
+One direction is to consider a block cipher $\E' : \ksb \times \msb \rightarrow \msb$
+instead of a public permutation $\Perm$. This gives the ``FX'' construction $\E(k||k_1||k_2,m)
+:= \E'(k, m \oplus k_1) \oplus k_2$, which was first suggested by Rivest and then analysed by Kilian and Rogaway~\cite{DBLP:journals/joc/KilianR01}. Using a method
+similar to the one of Even and Mansour, they proved that the PRP advantage (this time exactly in the sense of \autoref{def:prp})
+of an adversary attacking $\E$ is upper-bounded
+by $D\cdot T / 2^{\kappa + n - 1}$, where $D$  represents the number of queries to the unknown oracle $\ora$ and $T$ represents the ``time
+complexity'' of black-box accesses to the unkeyed $\E'$. One can see in particular that by taking $\kappa = 0$, i.e. fixing $\E'$ to be
+a public permutation, this upper-bound essentially matches the one of the Even-Mansour scheme.
+
+Another natural way to generalise the scheme is to compose it with independent instantiations of itself, i.e. defining $\E(k_1||k_2||\ldots||k_{r+1},m)$
+as $\Perm_{r}(\ldots\Perm_{1}(m \oplus k_1) \oplus k_2)\ldots) \oplus k_{r+1}$. Chen and Steinberger showed that this achieved a PRP security up to
+$\bigo(2^\frac{rn}{r+1})$ queries~\cite{DBLP:conf/eurocrypt/ChenS14}, while Lampe and Seurin showed an \emph{indifferentiability} property for the twelve-round iterated
+scheme that uses distinct permutations $\Perm_1, \ldots, \Perm_{12}$ but equal keys $k_1 = \ldots = k_{13}$~\cite{DBLP:conf/asiacrypt/LampeS13}.
+However, interestingly, the simplest
+and most economical way to compose an Even-Mansour scheme, i.e. taking $r$ identical permutations and $r+1$ equal keys does \emph{not} work, in the sense
+that it does not provide much more security than the original non-iterated scheme. Let us show why.
+
+Consider $\E(k,m) := \Perm(\ldots\Perm(m \oplus k)\ldots)\oplus k$ for an arbitrary large number of applications of $\Perm$. We first observe that
+if two values $x$ and $x'$ are related by $x' = x \oplus k$, then $\E(\Perm(x')) = \Perm(\E(x)) \oplus k$, and by symmetry $\E(\Perm(x)) = \Perm(\E(x')) \oplus k$.
+It follows that:
+\[
+\E(\Perm(x)) \oplus \Perm(\E(x)) = \Perm(\E(x')) \oplus k \oplus \Perm(\E(x)) = \E(\Perm(x')) \oplus \Perm(\E(x')).
+\]
+Thus, we can attack $\E$ with probability $\approx 1$ by picking $2^{n/2}$ random values $x$ and looking for collisions for the function $x \mapsto \E(\Perm(x)) \oplus
+\Perm(\E(x))$, each of them suggesting a candidate value for $k$. Note that unlike the attacks on the non-iterated Even-Mansour scheme, this one requires
+\emph{chosen plaintexts} (but variants requiring only \emph{known plaintexts} also exist, for instance by considering collisions between
+the lists $\{\Perm(\E(x)) \oplus x\}$ and $\{\E(x) \oplus \Perm^{-1}(x)\}$).
+
+\section{Related-key attacks}
+
+So far, we only focused on attacks from adversaries who could only access a single oracle, for instance corresponding to $\E(k,\cdot)$ for an unknown key
+$k$. A way to increase an adversary's power is then to allow access to a family of oracles, for instance corresponding to $\{\E(\rkf(k), \cdot),~\rkf \in \Phi \}$,
+still for an unknown key $k$, and $\Phi$ a set of \emph{related-key functions} $\ksb \rightarrow \ksb$. That is to say, the adversary is given access to
+$\E$ with several unknown keys that are related one to another through the elements of $\Phi$. We call \emph{related-key attack} an attack that corresponds
+to this model.
+
+The security requirements associated with related-key attacks are the same as for the \emph{single-key} case. For instance, we can informally state that
+it should be hard to recover the unknown $k$ for a cipher to which we are given related-key oracle access. It is also possible to define a
+related-key (S)PRP notion that generalises the one of \autoref{def:prp}, as was done by Bellare and Kohno~\cite{DBLP:conf/eurocrypt/BellareK03}.
+We let again $\iE$ denote an ideal cipher, such that for all $k$,
+$\iE(k,\cdot) \randraw \allperms$. We write $\iE \randraw \allpermfams$ the uniform sampling of such a cipher.
+We define a related-key oracle $\E_{\text{RK}(\cdot,K)}(\cdot)$ for a block cipher $\E : \ksb \times \msb \rightarrow
+\msb$ that takes a first input $\rkf : \ksb \rightarrow \ksb$ and a second input $m \in \msb$, and returns $\E(\rkf(K), m)$.
+We then have the following.
+
+\begin{defi}[Related-key PRP advantage restricted to $\Phi$]
+\label{def:rkprp}
+The \emph{related-key PRP advantage} of $\E$ with respect to the related-key class $\Phi$ is defined as:
+\[
+\Adv^\text{PRP-RKA}_{\Phi,\E}(q,t) := \max_{A_{q,t}} \left|\Pr\left[A_{q,t}^{\iE_{\text{RK}(\cdot,K)}(\cdot)} = 1 : K \randraw \ksb, \iE \randraw \allpermfams\right] -
+\Pr\left[A_{q,t}^{\E_{\text{RK}(\cdot,K)}(\cdot)} = 1 : K \randraw \ksb\right]\right|.
+\]
+\end{defi}
+
+One can see that this definition is parameterized by the allowed related-key class $\Phi$. In fact, this parameterization plays a major role in how secure
+a cipher can be according \autoref{def:rkprp}: there are classes $\Phi$ with respect to which \emph{no} cipher (even an ideal one)
+attains any meaningful level of security. For instance, assume that $\Phi$ includes a constant function $\rkf : x \mapsto c$; then an adversary
+may simply query its related-key oracle on $\rkf$ and an arbitrary $c'$ and compare the result with $\E(c,c')$; it succeeds with
+advantage close to one by answering 1 if the two values match and 0 otherwise.
+
+There are less trivial related-key classes for which similar problems occur. One of the perhaps less intuitive examples is to consider
+$\Phi = \rkf^\oplus \cup \rkf^+$, where $\rkf^\oplus = \{x \mapsto x \oplus \Delta,~\Delta \in \ksb\}$ and $\rkf^+ = \{x \mapsto x + \Delta,~\Delta \in \ksb\}$
+(with $+$ denoting here the addition modulo $2^\kappa$). Remarkably, non-trivial security \emph{is} achievable w.r.t. $\rkf^\oplus$ or $\rkf^+$
+in isolation. We will not explore this formally, rather focusing on the intuition.
+
+There are two key properties for $\Phi$ to allow non-trivial security. The first is that it be \emph{collision-resistant}, and the second that it
+be \emph{output-unpredictable}. Collision resistance means that it is hard to find two functions $\rkf$, $\rkf'$ such that $\rkf(K) = \rkf'(K)$
+for a uniform $K$. This is
+the property that does not hold for $\rkf^\oplus \cup \rkf+$ and that can be exploited to mount easy attacks using this class. However, it does
+hold trivially for, say $\rkf^\oplus$, as $\Delta \mapsto K \oplus \Delta$ is a permutation for any $K$.
+The output unpredictability property means that it is hard to guess $\rkf(K)$ for a uniform $K$; more generally, it should be hard
+to guess any of the elements of $\{\rkf(K), \rkf \in X \subseteq \Phi\}$ relatively to the size of $X$. It is easy to see that this property does not hold if
+$\Phi$ includes constant mappings, but that it does for $\Phi = \rkf^\oplus$.
+
+We now illustrate the fact that if many related-key queries with different functions $\rkf$ are allowed, the security of any cipher
+degrades significantly. Consider a simplified attack setting where the adversary interacts with a known cipher $\E$ with unknown key $k$ and
+tries to recover $k$. To do so, he is allowed oracle access to $\E(\rkf(k),\cdot)$, $\rkf \in \rkf^\oplus$. A good (in fact basically optimal)
+attack that does not exploit any properties of $\E$ consists in querying $\E(k \oplus \Delta,0)$ for $2^{\kappa/2}$ randomly selected
+$\Delta$ and putting the results in a list $\mathcal{L}$ along with the value $\Delta$. Then the adversary tries $2^{\kappa/2}$ candidates $k'$ for the key,
+each time computing $\E(k',0)$. Any match with an element of $\mathcal{L}$ suggests a value for $k$, and one expects such a match with high probability.
+
+\subsection{Provably-secure constructions}
+
+Even when $\Phi$ is restricted to \emph{meaningful} functions, the related-key model gives significantly more power to the adversary. The collision attack
+sketched above is an example; another one is to consider some very simple attacks on the Even-Mansour scheme. Let $\Phi$ include at least one
+function of the form $x \mapsto x \oplus \Delta$, then an adversary can distinguish an Even-Mansour scheme from an ideal cipher by querying
+$\E(k \oplus \Delta, \Delta)$, $\E(k, 0)$, and checking if the two values only differ by $\Delta$.
+
+This attack does not contradict the security proof of Even and Mansour, as it requires related-key queries that are not covered by the single-key proof.
+It does show however that a good cipher in the single-key setting might be terribly broken in a related-key setting, even w.r.t. ``meaningful''
+related-key classes.
+
+It is quite easy to see that the above attack also applies to iterated Even-Mansour schemes when independent keys are used at every round.
+A slightly more involved but also very efficient attack exists on the two-round scheme that uses identical keys. However, it was proven
+(in an ideal permutation model similar to the one of the single-key proof)
+that using three rounds or more with identical keys leads to a construction that is related-key secure w.r.t.
+$\rkf^\oplus$~\cite{DBLP:conf/eurocrypt/CogliatiS15,DBLP:conf/fse/FarshimP15}. 
+
+\subsection{Tweakable block ciphers}
+
+The fact that single-key and related-key security may be widely disconnected is part of the reason why not all concrete block ciphers are designed
+to be related-key secure. This comes usually with the argument that resisting related-key attacks (for some a priori defined classes)
+would add some computational overhead and that the model is altogether unrealistic, as no properly designed protocol would allow
+an attacker to make related-key queries. We will not delve into this debate whose implications are rather complex, instead giving
+an example of a constructive use of related-key secure ciphers.
+
+First, let us define \emph{tweakable block ciphers}. These are simply block ciphers that take a second parameter called a \emph{tweak},
+such that all distinct pairs of keys and tweaks define (ideally) independent permutations. The difference between the key and the
+tweak is that the latter is public and may be freely chosen by the adversary. Using simplified expressions for the domains, we have the
+following.
+
+\begin{defi}[Tweakable block ciphers]
+\label{def:tbc}
+A tweakable block cipher is a family of mappings $\TE : \ksb \times \tsb \times \msb \rightarrow \msb$ such that for all $k \in \ksb$,
+$t \in \tsb$, $\E(k, t, \cdot)$ is a permutation.
+\end{defi}
+
+Tweakable block ciphers are useful in that they allow to ``diversify'' a fixed-key instance without selecting a new, independent key.
+In other words, two communicating parties may first secretely share a secret key $k$ with which to use $\TE$, and then publicly agree on
+a new tweak for each message to be exchanged. 
+The concept of tweakable ciphers was formalised by Liskov et al.~\cite{DBLP:journals/joc/LiskovRW11},
+but already implicitly used for instance by Rogaway et al. to define an efficient
+mode of operation~\cite{DBLP:conf/ccs/RogawayBBK01}.
+
+A simple way to build a tweakable block cipher $\TE$ from a ``regular'' cipher $\E$ is to define $\TE(k,t,\cdot)$ as $\E(k \oplus t,\cdot)$.
+The security of this construction  fully reduces to the related-key security of $\E$ w.r.t. $\rkf^\oplus$, which may be non-trivial. For
+instance, this construction provably achieves a meaningful level of security in the ideal permutation model if $\E$ is a three-round
+iterated Even-Mansour scheme with identical keys. Note however that because of generic collision attacks, the security
+is limited w.r.t. the number of different tweaks for which $\TE$ is queried. The design of similar generic constructions that are
+secure beyond the birthday-bound is a rather active research topic. 
+
+
+\bibliographystyle{alpha}
+\bibliography{tehbib} 
+
+\end{document}
