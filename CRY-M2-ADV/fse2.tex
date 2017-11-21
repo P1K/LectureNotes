@@ -1,0 +1,554 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[english]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{amssymb}
+\usepackage{fourier}
+\usepackage{yfonts}
+\usepackage[hmargin=3cm,vmargin=2.4cm]{geometry}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage[linesnumbered]{algorithm2e}
+
+\hypersetup{
+  colorlinks=true,
+  citecolor=NavyBlue,
+  linkcolor=BrickRed,
+  urlcolor=Violet
+}
+
+\pagestyle{fancy}
+\fancyhead{}
+\fancyhead[L]{\href{https://www-ljk.imag.fr/membres/Pierre.Karpman/cry\_adv2017\_fse2.pdf}{https://www-ljk.imag.fr/membres/Pierre.Karpman/cry\_adv2017\_fse2.pdf}}
+
+\theoremstyle{definition}
+\newtheorem{defi}{Definition}
+\newtheorem{example}{Example}
+\def\defiautorefname{Definition}
+\def\exampleautorefname{Example}
+\theoremstyle{theorem}
+\newtheorem{thm}{Theorem}
+\def\thmautorefname{Theorem}
+
+
+\DeclareMathOperator\E{\mathcal{E}}
+\DeclareMathOperator\F{\mathcal{F}}
+\DeclareMathOperator\bF{\mathit{f}}
+\DeclareMathOperator\abF{\mathit{g}}
+\DeclareMathOperator\TE{\mathcal{\widetilde{E}}}
+\DeclareMathOperator\Perm{\mathcal{P}}
+\DeclareMathOperator\Walsh{\mathcal{W}}
+\DeclareMathOperator\cor{\mathit{C}}
+\DeclareMathOperator\ora{\mathcal{O}}
+\DeclareMathOperator\iE{\textswab{E}}
+\DeclareMathOperator\iPerm{\textswab{P}}
+\DeclareMathOperator\Adv{\mathbf{Adv}}
+\DeclareMathOperator\aes{AES-128}
+\DeclareMathOperator\bigo{\mathit{O}}
+\DeclareMathOperator\tighto{\Theta}
+\DeclareMathOperator\rkf{\varphi}
+\DeclareMathOperator\rf{\rho}
+\DeclareMathOperator\ksched{\Gamma}
+\DeclareMathOperator\DP{\mathrm{DP}}
+\DeclareMathOperator\EDP{\mathrm{EDP}}
+\newcommand\ks{\mathcal{K}}
+\newcommand\ms{\mathcal{M}}
+\newcommand\cs{\mathcal{C}}
+\newcommand\msb{\{0,1\}^n}
+\newcommand\ksb{\{0,1\}^\kappa}
+\newcommand\ksr{\{0,1\}^{\kappa'}}
+\newcommand\tsb{\{0,1\}^\theta}
+\newcommand\allperms{\Pi_n}
+\newcommand\allpermfams{\Pi_n^\kappa}
+\newcommand\randraw{\xleftarrow{{\scriptscriptstyle\$}}}
+\newcommand\charac{\xrightarrow{{\scriptscriptstyle\rf}}}
+
+\title{Advanced cryptology (GBX9SY06)\\
+\decosix\\
+Block ciphers 2}
+\date{2017-11}
+\author{Pierre Karpman}
+
+\begin{document}
+
+\renewcommand{\algorithmautorefname}{Algorithm}
+
+\maketitle{}
+
+\section{Divide \& conquer attacks}
+
+A historically and practically important technique used to attack block ciphers is the so-called Meet-in-the-middle attack (MiTM; not
+to be confused with the \emph{Man}-in-the-middle attack). This was first mentioned in the seventies by Diffie and Hellman~\cite{DBLP:journals/computer/DiffieH77} to show
+that composing two block ciphers with different keys did not increase the security as much as one could naively think; namely, the
+expected time complexity of the best generic attack only doubles, while one could have assumed that it goes to the square. In a nutshell,
+using the notation $\E_k$ for $\E(k,\cdot)$ when $\E$ is a block cipher, a MiTM attack on $\E_{k_1} \circ \E_{k_0}$ simply works as follows:
+\begin{enumerate}
+\item Obtain the ciphertext $c$ corresponding to a known plaintext $m$ for the unknown keys $k_0$ and $k_1$.
+\item Create a list $L$ of pairs $(k', \E(k',m)$ for all possible keys $k'$.
+\item For all possible $k''$, compute $x := \E^{-1}(k'',c)$. If $x$ is found as the second element of a pair $(k',\cdot)$ of $L$,
+output $(k'',k')$ as a key candidate for $(k_1,k_0)$.
+\end{enumerate}
+If $\kappa:=|k| > n:=|m|$, one may use more than one plaintext-ciphertext pair in order to avoid an exponentially-growing number of false
+positives. Apart from that, this algorithm minimizes the time complexity in generically attacking ``double-$\E$''. Note however that
+if one restricts the running time of the adversary to $t$, the above attack succeeds with probability at most $t^2/2^{2\kappa}$, which
+is generally lower than the generic complexity of $t/2^\kappa$ one can achieve in attacking $\E$ alone. It can in fact be proven
+that this gap cannot be filled~\cite{DBLP:conf/crypto/AielloBCV98}
+
+The basic property exploited in the above algorithm is that a collision between two a priori random lists suggests a candidate
+value for the key. If the lists are of size $N$ and $N'$, this allows to test up to $\bigo(N\cdot N')$ candidates for a certain
+condition, allowing for a quadratic gain in time complexity. This feature appears in many other collision-based ``MiTM'' attacks,
+such as the slide attacks on Even-Mansour constructions or the many-related-keys attack on any block cipher.
+
+MiTM attacks do not only apply in such generic settings. For instance, they can be useful in exploiting weaknesses in the
+key-schedule of a concrete iterated block cipher.
+\begin{defi}[Iterated block cipher]
+An \emph{iterated block cipher} is a block cipher $\E : \ksb \times \msb \rightarrow \msb$ that can be defined as
+the composition of a \emph{round function} $\rf : \mathbf{N} \times \ksr \times \msb \rightarrow \msb$ whose \emph{round-keys}
+are generated by a \emph{key-schedule} or \emph{key-expansion} algorithm $\ksched : \mathbf{N} \times \ksb \rightarrow \ksr$.
+That is, the $r$-round $\E(k,\cdot)$ is equal to $\rf(r,\ksched(r,k),\cdot) \circ \ldots \circ \rf(0,\ksched(0,k),\cdot)$.
+\end{defi}
+The huge majority of actual block ciphers are iterated. 
+
+One can see that the double-encryption construction $\E_{k_1} \circ \E_{k_0}$ can be redefined as a new block cipher
+$\E'_k$ with twice as much rounds as $\E$ and a ``bipartite'' key-schedule $\ksched'$ s.t. $\ksched'(0 \leq i \leq r, k) = \ksched(i,k_0)$
+and $\ksched'(r < i \leq 2r+1,k) = \ksched(i-r-1,k_1)$. While one does not expect a concrete design to exhibit such a strong independence
+property of two parts of its key schedule, weaker cases of independence remain possible.
+Consider for instance an imaginary block cipher $\E$ which is such that
+with high probability (over the keys and the plaintexts), a certain subset $\mathcal{S}$ of the bits of the intermediate ciphertext after
+$r_f$ rounds, i.e. the image of $\rf(r_f,\cdot,\cdot) \circ \ldots \rf(0,\cdot,\cdot)$, only depends on a subset $\mathcal{K}_0$
+of the key bits. Assume further that with high probability (over the keys and the ciphertexts), this same subset only depends on
+a subset $\mathcal{K}_1$ of the key bits when computed as a partial decryption, i.e. as the image of
+$\rf^{-1}(r_f - 1,\cdot,\cdot) \circ \ldots \circ \rf^{-1}(r,\cdot,\cdot)$. Then if $\mathcal{K}_0 - \mathcal{K}_1 \neq \emptyset$ and
+$\mathcal{K}_1 - \mathcal{K}_0 \neq \emptyset$,
+one can mount a MiTM attack that independently searches for the bits of either set difference.
+This kind of approach is for instance the basis for the currently best attacks on the lightweight block cipher KATAN~\cite{DBLP:conf/ches/CanniereDK09,DBLP:conf/fse/FuhrM14}.
+
+%TODO MOAR???
+
+\section{Statistical attacks \& distinguishers}
+
+We now introduce an altogether different approach that is very successful in attacking many block ciphers, namely \emph{statistical}, distinguisher-based attacks.
+This denomination typically regroups \emph{differential} and \emph{linear} cryptanalysis, which are related in many ways. We will mostly focus on differential
+attacks, but also briefly mention the linear case. both of these approaches were successfully used to attack des in the early
+nineties~\cite{DBLP:conf/crypto/BihamS90,DBLP:conf/eurocrypt/Matsui93}.
+
+\paragraph{Note on signature types.}
+Fundamentally, block ciphers operate on binary data that does not correspond to any abstract element such as a vector (in the mathematical sense),
+a finite field element, etc. This is why we typically have $\E : \ksb \times \msb \rightarrow \msb$. However, in the same way as concrete
+designs sometimes benefit from algebraic constructions by seeing their inputs as mathematical objects, attacks may also be defined as operating
+on, say, vectors of $\mathbf{F}_2^n$ rather than binary strings of length $n$. When this is the case, one needs to agree on a mapping from
+one set to another. Fortunately, this is usually straightforward.
+
+\subsection{The Differential case}
+
+\begin{defi}[Differential]
+Let $\E$ be a block cipher, a \emph{differential} is a pair $(\Delta \neq 0,\delta)$ of input and output \emph{differences} for $\E$, according to some
+group law $+$ (generally taken to be the addition in $\mathbf{F}_2^n$, i.e. the XOR or $\oplus$).
+\end{defi}
+An input $(k,m)$ to $\E$ is said to \emph{verify} the differential
+$(\Delta,\delta)$ if $\E(k,m + \Delta) - \E(k,m) = \delta$. If the key is fixed, we may also call \emph{differential pair}
+for $(\Delta,\delta)$ an ordered pair $((m,c),(m',c'))$  of two plaintext-ciphertext pairs for $\E(k,\cdot)$ s.t. $m'-m = \Delta$ and $c'-c=\delta$.
+Note that over $\mathbf{F}_2^n$, addition coincides with subtraction, and the following expressions can be simplified. We always consider such a case
+from now on.
+
+The usefulness of the notion of differential comes from the fact that it is often a good distinguisher between mappings that are ``ideally random'' or not.
+That is, one will exploit statistical properties of $x \mapsto \Perm(x) \oplus \Perm(x \oplus \Delta)$ (for some $\Delta$) in the hope of deciding
+whether $\Perm = \E(k,\cdot)$ for some unknown key $k$ or if it is a random permutation. This can be done by considering the \emph{differential
+probability} of the differential.
+\begin{defi}[Differential probability]
+The \emph{differential probability} of a differential $(\Delta,\delta)$ w.r.t. a permutation $\Perm$ is the probability of obtaining a differential
+pair for $\Perm$:
+\[
+\DP^{\Perm}(\Delta,\delta) := \Pr_{m \in \msb}[\Perm(m) \oplus \Perm(m \oplus \Delta) = \delta].
+\]
+\end{defi}
+Note that the differential probability is a function of both the differential itself and the permutation. In particular, this means that for
+a block cipher, we may (and usually do) have $\DP^{\E(k,\cdot)}(\Delta,\delta) \neq \DP^{\E(k'\neq k,\cdot)}(\Delta,\delta)$, for an
+arbitrary $(\Delta,\delta)$. This leads to the notion of \emph{expected differential probability} for block ciphers, which is simply
+the average over $k$ of the differential probability of $\E(k,\cdot)$:
+\[
+\EDP^{\E}(\Delta,\delta) := 2^{-\kappa} \sum_{k \in \ksb} \DP^{\E(k,\cdot)}(\Delta,\delta).
+\]
+A convenient (unfortunately not necessarily true) hypothesis is that any fixed-key $\DP$ for $\E$ is ``close'' to the $\EDP$.
+%This could
+%be expressed as requiring that $\max/\min_{k \in \ksb}\DP^{\E(k,\cdot)}/\EDP^{\E}$ is close to one for most differentials.
+In order to distinguish $\E$ from a random permutation $\Perm$, then one only needs the difference between $\EDP^{\E}(\Delta,\delta)$ and
+$\DP^{\Perm}(\Delta,\delta)$ to be sufficiently large for a given (known) $(\Delta,\delta)$.
+This begs the question of what is the expected value of $\DP^{\Perm}$ for a random differential. In the non-injective case, replacing
+$\Perm$ by a random function $\F$, the answer is easy. By definition, $\F(x) \randraw \msb$, thus $\Pr[\F(x) \oplus \F(x\oplus\Delta) = \delta]
+= \Pr[\F(x) = \delta \oplus \F(x\oplus\Delta)] = 2^{-n}$. The injective case is more complex, but one can show that the number of
+differential pairs is approximately drawn according to a Poisson distribution of mean and
+variance $2^{-1}$~\cite{DBLP:journals/joc/OConnor95,DBLP:journals/jmc/DaemenR07}. This means
+that the expected $\DP$ is also equal to $2^{-n}$; note however that it can only take values multiple of $2^{-n+1}$ (as differential
+pairs are symmetric and thus come by two). It is also worthwhile to remark that if $\Perm$ is \emph{linear} w.r.t. the difference
+operation (here $\oplus$), then by definition, $\DP^{\Perm}(\Delta,\delta) = 1$ if $\Perm(\Delta) = \delta$, $0$ otherwise.
+
+We now have everything we need to describe a differential distinguisher on a block cipher. This is done in \autoref{alg:diffdist}.
+\begin{algorithm}[htb]
+ \caption{Differential distinguisher for $\E$\label{alg:diffdist}}
+ \KwIn{$\ora \randraw \{\Perm, \E(k \randraw \ksb,\cdot)\}$; $(\Delta,\delta)$ of $\EDP^{\E} = p$}
+ \KwOut{1 if $\ora = \Perm$, 0 otherwise}
+\Begin{
+	count := 0\\
+	mult := 10 \tcc{Can be set to other values}
+	\For{$ i := 0;~i < \textrm{mult}/p$}
+	{
+		$m \randraw \msb$ \tcc{Without replacement}
+		\If{$\ora(m) \oplus \ora(m \oplus \Delta) = \delta$}
+		{
+			count := count + 1
+		}
+	}
+	\If{count = 0}
+	{
+		\Return{1}
+	}
+	\Else
+	{
+		\Return{0}
+	}
+}
+\end{algorithm}
+This distinguisher only succeeds with some probability, that can among other things
+depend on the actual value of $\DP^{\E(k,\cdot)}$ for the random key $k$. The multiplicative constant on line 3 can be set
+to ensure that at least one differential pair is found with high probability. However, if the $\EDP$ is close to $2^{-n}$,
+selecting a large constant may decrease the success probability, by increasing the likelihood that a differential pair is
+found for a random permutation (this issue may be slightly reduced by having the algorithm returning zero as soon as
+a differential pair is found).
+Finally, the data complexity is of $2\cdot\text{mult}/p = \tighto(p^{-1})$ chosen plaintexts, which directly dictates
+the time complexity as well, while the memory complexity is negligible.
+
+Finding a distinguisher is enough to break the PRP security of a block cipher. However, when possible, it is
+even better for an attack to recover some key material. It is also possible to do so with differential attacks,
+by using a distinguisher as a test for the possible values of (part of) the unknown key.
+
+We describe this
+process in a case where the block size $n$ is equal to half of the key size $\kappa$ and where round keys
+are as long as the block. We also assume that there are only $2^n$ keys corresponding to a fixed $n$-bit round key, and that these are
+easy to enumerate. A simple key schedule for which this statement is true is $\ksched(i,k_1||k_0) := k_{(i\mod 2)}$.
+In that case, an attacker might enumerate all $2^n$ possible values for the last round key and; if he is
+able to uniquely determine the right one thanks to a distinguisher, the full key can be determined by again enumerating
+all possible $2^n$ values and checking them w.r.t. a few plaintext-ciphertext pairs.
+
+The crucial step is the first one, that is trying to distinguish the right guess for the last round key from all the other ones.
+In a differential attack, this might be done by having a ``good'' distinguisher up to the before-last round. Say that
+the expected probability of the differential used in this distinguisher is $p \gg 2^{-n}$, i.e. $\EDP^{\E/(r-1)} = p$, where $\E/(r-1)$
+denotes $\E$ reduced to $r-1$ rounds. One assumes that the $\EDP$ of the same differential is much smaller after $r$ rounds,
+i.e. $\EDP^{\E/r} \ll p$. Going further, we assume that composing $\E/r$ with \emph{the inverse of the round function with a random round key}
+does not increase the $\EDP$ of the differential (ideally increasing it); that is, if we let $\E'(k,\cdot) := \rf^{-1}(r,k'\randraw\ksr,\cdot) \circ \E/r(k,\cdot)$,
+we assume that $\EDP^{\E'} \lll p$. With these assumptions, the attacker may then run the following \autoref{alg:diffkr}, at the end of which a further $2^{n}$
+candidates for the entire key need to be tried.
+\begin{algorithm}[htb]
+ \caption{Differential key-recovery attack for $\E$\label{alg:diffkr}}
+ \KwIn{$\ora = \E(k \randraw \ksb,\cdot)\}$; $(\Delta,\delta)$ of $\EDP^{\E/(r-1)} = p$}
+ \KwOut{A candidate for the last round key}
+\Begin{
+	max := 0\\
+	cand := 0\\
+	\ForAll{$k' \in \msb$}
+	{
+	count := 0\\
+	mult := 10\\
+	\For{$ i := 0;~i < \textrm{mult}/p$}
+	{
+		$m \randraw \msb$\\
+		$c_0 := \rf^{-1}(r,k',(\ora(m)))$\\ 
+		$c_1 := \rf^{-1}(r,k',(\ora(m \oplus \Delta)))$\\ 
+		\If{$c_0 \oplus c_1 = \delta$}
+		{
+			count := count + 1
+		}
+	}
+	\If{count > max}
+	{
+		max := count\\
+		cand := $k'$
+	}
+	}
+	\Return{cand}
+}
+\end{algorithm}
+The time complexity of this algorithm is $\tighto(2^n\cdot p^{-1})$; its memory and data complexity depend whether one is able to reuse data for
+different key guesses; its success probability depends on the validity of all the involved hypotheses (which unfortunately
+might be hard to test). Note that in practice, one does not need
+to return a single candidate: it is perfectly reasonable to keep all candidates whose counter is above a certain threshold. Of course, this requires
+some additional memory and subsequent tests for the correct full key, so it is still best to keep this number quite low.
+
+The basic approach as sketched above is unlikely to be used as is in an actual attack. For instance, the process used to guess (and eliminate) (part of)
+a round key may be more complex; several differentials may be used; \emph{truncated} differentials may be employed; some early-abort strategies may
+be deployed; etc. We do not describe these in these notes and refer an interested reader to e.g. \cite{DBLP:books/daglib/0028270,DBLP:conf/sacrypt/Dinur14}.
+
+\medskip
+
+So far, we have assumed that a suitable differential $(\Delta,\delta)$ was known to the attacker. Most of the time, finding such a differential
+is in fact the crux of the attack. We will not address this problem, but briefly mention one of the starting points to do so, that is finding
+differential \emph{characteristics} (or trails).
+
+In all genericity, the differential probability $\DP^{\Perm}(\Delta,\delta)$ for $\Perm : \msb \rightarrow \msb$ and a
+single differential requires to enumerate all possible inputs to $\Perm$, i.e.
+with time complexity $\tighto(2^n)$ and negligible memory; computing \emph{all} differentials can be done in time $\tighto(2^n)$ and
+memory $(\tighto(2^n)$. When $n$ is large (for instance because $\Perm$ is the round function of a block cipher), this (doubly-)exponential
+complexity is intractable. However, if $\Perm$ is a small component used as part of a round function, for instance an 8-bit S-box, the associated
+complexity is perfectly reasonable. If $\E$ is a substitution-permutation-network block cipher, this fact can be used to efficiently compute
+the differential probability of its round function for an arbitrary differential: the $\DP$ of the S-boxes are explicitly computed, while the
+$\DP$ of the linear layer is known. This is not directly useful, as attacking one round of a block cipher
+is usually not an impressive feat. However, one may hope to chain several one-round differentials to obtain a characteristic.
+
+\begin{defi}[Differential characteristic]
+Let us write $\Delta \charac \Delta'$ the fact that $(\Delta,\Delta')$ is a differential for the round function $\rf$ (where we drop the round
+index and the key for simplicity). An $r$-round \emph{differential characteristic} for $\rf$ is an $(r+1)$-tuple
+$(\Delta_0,\ldots,\Delta_r)$ s.t. $\Delta_0 \charac \Delta_1 \charac \ldots \charac \Delta_r$. 
+\end{defi}
+
+Note that if an input follows a characteristic\footnote{Defined in the obvious way.} $(\Delta_0,\ldots,\Delta_r)$, then it is also a differential pair for the $r$-round
+differential $(\Delta_0,\Delta_r)$. While the converse is not true in general, one sometimes assume that if a characteristic
+has a high probability of being followed by a random input, relatively to the block size, then it is dominating the other characteristics
+that lead to the same differential and the probability of the latter is close to the one of the former. This hypothesis is quite tempting,
+especially as estimating the probability of a characteristic is much easier than for a differential, even if it requires its own hypotheses. 
+
+Let us consider a characteristic $C := (\Delta_0,\ldots,\Delta_r)$. We assume that if all round keys of $\rf$ are independent and random,
+the probability that an input follows the $C$ is equal to the product of the one-round differential probabilities, that is
+equal to $\Pi_{0\leq i < r} \DP^{\rf}(\Delta_i,\Delta_{i+1})$. This is the \emph{Markov assumption}~\cite{DBLP:conf/eurocrypt/LaiM91}. In practice, for want of
+a better model, we assume the same even if the round keys are not independent (which is more often the case than not).
+Using this assumption, one may use various ways to find $r$-round characteristics and their associated probabilities, for instance
+``by hand'', or using Matsui's branch-and-bound algorithm~\cite{DBLP:conf/eurocrypt/Matsui94}.
+
+%structure (several diffs, so...?)
+
+\subsection{The Linear case}
+
+Linear cryptanalysis presents many similarities with the differential approach. The main difference comes from the nature of the statistical
+property exploited in the underlying distinguishers: in the linear case, one is interested in how \emph{biased} is a linear equation in the input
+and output bits of a permutation. 
+\begin{defi}{Walsh transform}\label{def:walsh}
+The \emph{Walsh transform} $\Walsh^{\Perm} : \msb \times \msb \rightarrow \mathbf{Z}$ of $\Perm : \msb \rightarrow \msb$ is defined extensively by:
+\[
+\Walsh^{\Perm}(a,b) := \sum_{m \in \msb} -1^{\langle b, \Perm(m)\rangle + \langle a, m \rangle},
+\]
+where $\langle x, y\rangle,~x,y \in \msb$ denotes the $\{0,1\}$-valued dot product between $x$ and $y$ when seen as vectors of $\mathbf{F}_2^n$.
+\end{defi}
+One can note the similarity of the expressions defining $\Walsh^{\Perm}(a,b)$ and $\DP^{\Perm}(\Delta,\delta)$: both involve an expression
+relating the input and output of $\Perm$, that is evaluated over all its possible inputs. A difference however is that in the linear case,
+we only consider a single value $\Perm(m)$ at a time whereas the differential looks at pairs of input related in a certain way. A consequence
+of this is that linear attacks may only rely on \emph{known} plaintexts, versus chosen plaintexts for differential ones.
+
+The equation defining the Walsh transform can be defined in words as counting how often a given \emph{linear approximation}
+$\langle a, m \rangle = \langle b, \Perm(m) \rangle$ with \emph{linear masks} $(a,b)$ holds,
+versus how often it does not, when $m$ ranges over all possible values. In the extreme
+case where $\Perm$ is linear, this equality is either always true or always false, and $\Walsh^{\Perm}(\cdot,\cdot) = \pm 2^n$. On the other
+hand, if the approximation with masks $(a,b)$ holds approximately the same number of time that it does not, then $\Walsh^{\Perm}(a,b)$ is
+small.
+
+The \emph{correlation} $\cor_{\Perm}(a,b)$ of a linear approximation $(a,b)$ for $\Perm$ is defined directly from the Walsh transform as
+$\cor_{\Perm}(a,b) = \Walsh^{\Perm}(a,b)/2^n$; this quantity thus ranges from $-1$ to $1$.
+One can show that for a non-trivial approximation $(a,b)$ and $n \geq 5$, the distribution
+of $\cor(a,b)$ over all $n$-bit permutations can be approximated by a normal distribution
+$\mathcal{N}(0,2^{-n})$~\cite{DBLP:journals/jmc/DaemenR07,DBLP:conf/fse/BogdanovT13}. This means
+that if a certain $\Perm$ is such that $C = \cor_{\Perm}(a,b)$ is sufficiently away from $0$ for a given approximation $(a,b)$, one
+may be able to distinguish it from a random permutation in a way similar to \autoref{alg:diffdist}: an adversary
+may count how many times the
+approximation holds over sufficiently many $D := \tighto(C^2)$ input values, and decide that he is interacting with $\Perm$ if this is sufficiently away
+from $D/2$. Finally, to continue the analogy, such distinguishers can also be used in key-recovery attacks, and linear approximations can also be chained over several rounds
+in a way similar to differential characteristics.
+
+
+\section{Algebraic attacks}
+
+
+We will for a moment step back from $n$-to-$n$-bit mappings, and consider the $n$-to-one case of \emph{Boolean functions}.
+\begin{defi}[Boolean function]
+A \emph{Boolean function} with $n$ variables is a mapping $\bF : \mathbf{F}_2^n \rightarrow \mathbf{F}_2$. 
+\end{defi}
+Note that we could have alternatively used a signature $\bF : \msb \rightarrow \{0,1\}$, which would be equivalent for most purposes.
+Our choice was motivated by the fact that we will precisely treat Boolean functions as algebraic objects. However, we will
+nonetheless adopt a compact representation for vectors of $\mathbf{F}_2^n$, writing $011\ldots$ for the vector $[0, 1, 1, \ldots$.
+
+A natural way to represent an $n$-variable Boolean function $\bF$ is to define its ``truth table'', that is, to list all its $2^n$ possible
+inputs and their associated evaluation. This simply requires a string $s_{\bF}$ of $2^n$ bits, where the value of the $i^\text{th}$ bit
+of the string $s[i]$ is given by the evaluation of $\bF$ on the vector that maps to $i$ as a binary integer.
+\begin{example}
+\label{example1}
+The 3-variable Boolean function $\bF$ given by
+$\bF(000) = 1$,
+$\bF(001) = 0$,
+$\bF(010) = 0$,
+$\bF(011) = 1$,
+$\bF(100) = 1$,
+$\bF(101) = 1$,
+$\bF(110) = 0$,
+$\bF(111) = 1$, can be represented by the truth table \texttt{10011101}, read from left to right (i.e. the bit of smallest index is on the left).
+\end{example}
+With this representation in mind, it is particularly obvious that there are $2^{2^n}$ distinct $n$-variable Boolean functions: one for each $2^n$-bit
+string.
+
+An important fact about Boolean functions is that they possess another ``natural'' representation, as multivariate polynomials over $\mathbf{F}_2$.
+\begin{defi}[Algebraic normal form and degree of a Boolean function]
+The \emph{algebraic normal form} (ANF) of the $n$-variable Boolean function $\bF$ is the unique polynomial
+$\abF \in \mathbf{F}_2[X_0,X_1,\ldots,\linebreak X_{n-1}]/\langle X_i^2 - X_i \rangle_{i < n}$ such that for all $x \in \mathbf{F}_2^n$,
+$\bF(x) = \abF(x[0], x[1],\ldots,x[n-1])$.
+
+The \emph{degree} of $\bF$ is the degree of its ANF $\abF$.
+\end{defi}
+
+
+We can prove existence and unicity with these statements: 1) any polynomial of $\mathbf{F}_2[X_0,X_1,\linebreak\ldots,X_{n-1}]/\langle X_i^2 - X_i \rangle_{i < n}$
+maps to an $n$-variable Boolean function defined by its evaluation; 2) this mapping is injective, as 
+two distinct such polynomials $g$, $g'$ define different Boolean functions,
+since their difference $g - g'$ is not the zero polynomial (and hence does not uniformly evaluate to zero); 3) this mapping is bijective, as
+the two sets have the same cardinality.
+
+\medskip
+
+We now have at least two ways of representing a Boolean function: by its truth table and by its ANF. However, while going from the ANF to the truth
+table is easy, we still need an efficient way of computing the ANF of a function given its truth table. Fortunately, it turns out that doing
+so is easy too.
+
+First, stating the obvious, computing the ANF means retrieving the value of the coefficient in front of all possible $2^n$ monomials (which
+is either one or zero). This is trivial for the constant monomial (written $g_{00\ldots0}$): the ANF $\abF$ of $\bF$ has a constant term iff $\bF(00\ldots0) = 1$.
+Indeed, by definition, $\abF(0,0,\ldots,0) = g_{00\ldots0} = \bF(00\ldots0)$.
+This is not too hard either for the $n$ degree-one monomials $X_0,\ldots X_{n-1}$. Say that we want to compute the coefficient $g_{10\ldots0}$
+in front of $X_0$: we just need to evaluate $\bF$ on $10\ldots0$ and add the result (modulo two) to $g_{00\ldots0}$;
+this is again simply by definition, as $\bF(10\ldots0) = g_{10\ldots0}X_0 + g_{00\ldots0}$, so
+$\abF(1,0,\ldots0) = \bF(10\ldots0) + g_{00\ldots0} = \bF(10\ldots0) + \bF(00\ldots0)$.
+We then simply proceed inductively for higher-degree monomials. For instance,
+$g_{110\ldots0}$ is given by $\bF(110\ldots0) + \bF(100\ldots0) + \bF(010\ldots0) + \bF(000\ldots0)$, and more generally
+$g_u = \sum_{v \preccurlyeq u} \bF(v)$, where $a \preccurlyeq b,~a,b\in \mathbf{F}_2^n$ if $\forall i, b[i] = 0 \Rightarrow a[i] = 0$.
+The mapping $u \mapsto g_u$ is called the \emph{Möbius transform(ation)}.
+
+\begin{example}
+The ANF of the Boolean function $\bF$ of \autoref{example1} is given by
+$\abF = 1 + X_1 + X_2 + X_0X_2 + X_0X_1X_2$.
+\end{example}
+
+This approach calls for three major comments. The first is that to compute a coefficient $g_u$, of a degree-$d$ monomial $X_u$,
+we are in effect differentiating $d$ times the $d$-variate polynomial $\abF'$ whose variables are the ones appearing
+in $X_u$. This polynomial is of degree at most $d$, with only $X_u$ as a possible degree-$d$ monomial. Thus, the result
+of the differentiation is either a non-zero constant polynomial (i.e. 1) if $\abF'$ is of degree exactly $d$, or the
+zero function. This in turns indicates if $X_u \in \abF'$, i.e. the value of $g_u$.
+
+Formally, the notion of differentiation that we use is defined as follows.
+\begin{defi}[Derivative of a Boolean function]
+The \emph{derivative} of a Boolean function $\bF : \mathbf{F}_2^n \rightarrow \mathbf{F}_2$ \emph{along} $\Delta \in \mathbf{F}_2^n$
+is defined as $\partial\bF/\partial\Delta := x \mapsto \bF(x) + \bF(x + \Delta)$. The order-$d$ derivative
+$\partial^d\bF/\partial\Delta_0,\ldots\Delta_{d-1}$ is defined as $\partial(\ldots(\partial\bF/\partial\Delta_0)\ldots)/\partial\Delta_{d-1}$.
+\end{defi}
+
+The second comment is related to the complexity of computing the ANF of $\bF$ from its truth table. A naïve implementation might simply compute
+the value of each coefficient independently; there are $2^n$ of them, and the coefficient of a monomial of degree $d$ requires
+$2^d$ evaluations of $\bF$. The total complexity of this approach is thus $\sum_{0 \leq i \leq n} \binom{n}{i}2^i = 3^n$. However, one
+can do much better by observing that computing the coefficient of $g_u$ uses as intermediate results the values of all of the
+$g_v,~v \preccurlyeq u$. In particular, the computation of $g_{111\ldots1}$ uses the values of \emph{all} of the other $g_u$s.
+Thus, we only need to compute $g_{111\ldots1}$ while computing all intermediate values only once and storing them along the way.
+This can be done conveniently in a recursive way: first compute the ANF of the two degree-$(n-1)$
+functions $\bF^{(1)} := \abF(1,\cdot,\cdot,\ldots,\cdot)$ and $\bF^{(0)} := \abF(0,\cdot,\cdot,\ldots,\cdot)$, obtaining $\abF^{(1)}$ and
+$\abF^{(0)}$, then return $\abF(X_0,\ldots,X_{n-1}) = X_0\abF^{(1)}(X_1,\ldots,X_{n-1}) + \abF^{(0)}(X_2,\ldots,X_{n-1})$.
+This algorithm can be transformed into an efficient iterative and in-place procedure~\cite{algocrypt}, given as \autoref{alg:moebius}.
+\begin{algorithm}[htb]
+ \caption{Fast Möbius transform computation (iterative version)\label{alg:moebius}}
+ \KwIn{The truth table $s$ of an $n$-variable Boolean function $\bF$}
+ \KwOut{The table $s$ is overwritten with the coefficients of $\abF$, the ANF of $\bF$}
+\Begin{
+	\For{$i:=0;~i<n$}
+	{
+		$L~:=~2^i$\\
+		$R~:=~0$\\
+		\While{$R < 2^n$}
+		{
+			\For{$j := 0;~j<L$}
+			{
+				$s[L + R + j]~:=~s[L + R + j] \oplus s[R + j]$
+			}
+			$R~:=~R+2L$ 
+		}
+	}
+}
+\end{algorithm}
+The inner loop 5--10 is executed $n$ times by the outer loop. Its $i^\text{th}$ execution takes $2^{n-i}$ executions of the innermost loop
+6--8 that itself performs $2^i$ elementary computations. The total complexity of \autoref{alg:moebius} is thus $n2^n$ elementary operations.
+This compares very favourably with the cost of $3^n \approx 2^{1.58n}$ of the naïve algorithm, even for small values of $n$.
+
+The third and last comment we make is that the Möbius transform is its own inverse, i.e. an involution. One can prove this statement
+recursively by seeing that $\bF(00\ldots0) = \abF(00\ldots0)$ and that
+\begin{align*}
+\abF(1,0,\ldots,0) = \bF(10\ldots0) + \bF(00\ldots0)\\
+\Leftrightarrow \abF(1,0,\ldots,0) = \bF(10\ldots0) + \abF(0,0,\ldots,0)\\
+\Leftrightarrow \bF(10\ldots0) = \abF(1,0,\ldots,0) + \abF(0,0,\ldots,0).
+\end{align*}
+
+One should notice the relation between a Möbius and a Fourier transform: both allow to interpolate a function from its values and vice-versa.
+The Walsh transform of \autoref{def:walsh} could also be seen as a kind of Fourier transform, and can also be computed with a fast algorithm.
+
+\bigskip
+
+We now go back to $n$-to-$n$-bit mappings $\Perm$. As any such mapping can be written as the collection of $n$ $n$-to-one-bit Boolean functions,
+all of the results obtained so far in this section extend smoothly. In particular, one may define the ANF of $\Perm$ as the collection
+of the ANFs of its constituent Boolean functions (e.g. projected on the canonical basis). This allows to naturally define the degree
+of $\Perm$ to be the maximal degree of its $n$ Boolean functions (obtained in turn thanks to their respective ANFs). An important fact
+is that if $\Perm$ is a permutation, then it is of degree at most $n-1$. This is simply a consequence of the fact that the
+coefficient of the unique degree-$n$ monomial (for each of the projected functions) is given by a projection
+of $\bigoplus_{x \in \{0,1\}^n} \Perm(x) = 0$. 
+
+The degree of a mapping $\Perm$ can be used as a distinguisher. A random mapping should be of maximal degree (i.e. $n-1$) with high
+probability: one ANF of its constituent functions may be drawn at random (with the constraint that it is not of degree $n$), and
+the probability that all the coefficients of the $n$ degree-$(n-1)$ monomials is zero is $2^{-n}$. Thus, if a concrete mapping
+is of a lower degree, we can use this as a distinguishing criterion, provided that we have an efficient test for the degree.
+
+The simplest way to compute the degree of $\Perm$ is to compute its ANF. However, this is exponential in the block size of $\Perm$,
+and thus quickly becomes intractable in a cryptographic context. If the degree $d$ to be tested for is not too high, an efficient
+alternative is to differentiate $\Perm$ at order $d+1$ along $\Delta_0,\ldots,\Delta_d$ in a way that is equivalent to
+computing one coefficient $g_u$ of the ANFs of each of the constituent functions $\Perm$, i.e. by having all the $\Delta_i$s of weight one and disjoint support (e.g.
+$\Delta_0 = 100\ldots$, $\Delta_1 = 0100\ldots$, etc.) and evaluating the resulting function
+on an arbitrary point. Doing thusly, if $\Perm$ is of degree $d$, the result is necessarily zero
+over all the $n$ functions of $\Perm$;
+on the other hand, if it is of degree (much) larger than $d$, the result is zero iff $X_u$ is not a given (sub)monomial in the ANF of any of the functions of,
+say, a random permutation.
+%As $X_u$ appears in $2^{n-(d+1)}$ monomials (itself, and all ways to complete it up to degree $n$, minus the degree-$n$ monomial), it is highly unlikely
+%that this happens.
+By repeating the test a few time with different monomials, one can distinguish the high and low degree cases with high probability. Note that the fast
+Möbius transform can be used both to compute a single test and to efficiently bundle several one into the test for an even higher-degree monomial.
+
+Algebraic attacks such as the above are somewhat less common than differential and linear cryptanalysis, but they can nonetheless be very effective.
+Some examples are given by attacks on the Trivium stream cipher~\cite{DBLP:conf/eurocrypt/DinurS09,DBLP:conf/fse/FouqueV13},
+reduced-round Keccak~\cite{DBLP:conf/fse/BouraCC11} or the ASASA construction~\cite{DBLP:conf/asiacrypt/MinaudDFK15,DBLP:journals/iacr/BiryukovK15a}.
+Some of these attacks use a particularly nice theorem due to Boura, Canteaut and De~Cannière, that provides a non-trivial upper-bound for
+the degree of an iterated mapping. Quite trivially, if $\rf$ is of degree $d$, then $\rf^r$ is of degree less than $d^r$. This already
+provides a lower-bound on the necessary number of rounds for, say, an iterative cipher, to resist the above attack. However, what Boura et al.
+showed is that if $\rf$ uses ``small'' S-boxes of non-maximal degree, the degree of $\rf^r$ may be much lower. We state a particular case of their theorem as
+\autoref{thm:lodeg}
+\begin{thm}[\cite{DBLP:conf/fse/BouraCC11}]
+\label{thm:lodeg}
+Let $\rf : \msb \rightarrow \msb$ be a function corresponding to the concatenation of $m$ smaller invertible S-boxes of size $n_0 \geq 3$
+and degree at most $n_0 - 2$, then for any function $\rf' : \msb \rightarrow \msb$, we have:
+\[
+\deg(\rf' \circ \rf) \leq n - \frac{n - \deg(\rf')}{n_0 - 2}
+\]
+\end{thm}
+For instance, if $\rf$ uses 32 degree-2 4-bit S-boxes, the naïve bound tells us that at least 7 rounds are necessary to reach
+the maximal degree $127 < 2^7$, while \autoref{thm:lodeg} gives a much higher number of at least 12 rounds (the successive
+upper-bounds being 2, 4, 8, 16, 32, 64, 96, 112, 120, 124, 126, 127). 
+
+\medskip
+
+A well-known example of distinguisher that can be thought of in an algebraic way is the square/integral/saturation
+distinguisher on 3-round AES. Recall that this distinguisher works by fixing the input to fifteen of the sixteen AES S-boxes
+to a constant and summing the 256 3-round ciphertexts obtained when the input to the last S-box ranges over all possible values.
+The distinguishing criterion is then for this sum to be zero. In other words, one is simply computing the presence of
+certain degree-8 monomials that are guaranteed to be absent in the ANF of 3-round AES, unlike in the case of a random function.
+
+Finally, one should also mention the relation between the ``deterministic'' version of algebraic attacks that we have introduced
+and their statistical counterparts of \emph{higher-order differentials}. The astute reader will have noticed that differential
+cryptanalysis exploits statistical properties of order-one derivatives along the input differences $\Delta$, where
+the fact that $(\Delta,\delta)$ is a high-probability differential means that this derivative is biased towards
+$\delta$. There is no
+reason why this could not be generalized to higher-order derivatives as well, exploiting the bias of, say,
+$x \mapsto \Perm(x) \oplus \Perm(x \oplus \Delta_0) \oplus \Perm(x \oplus \Delta_1) \oplus \Perm(x \oplus \Delta_0 \oplus \Delta_1)$.
+Because each round of differentiation may decrease the degree of the resulting mapping, it may become more biased towards
+certain values than higher-degree ones (for instance, a degree zero mapping is indeed very biased towards its constant value!).
+A drawback of this approach, however is that the evaluation of a derivative grows exponentially in its order. 
+
+\bibliographystyle{alpha}
+\bibliography{tehbib}
+
+\end{document}
