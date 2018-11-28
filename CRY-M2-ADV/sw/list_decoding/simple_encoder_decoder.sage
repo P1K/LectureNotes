@@ -1,11 +1,11 @@
 from sage.crypto.boolean_function import BooleanFunction
 
 def SRM_Encoder(mess, dim_redund):
-	dim_mess 	= mess.length()
+	dim_mess = mess.length()
 	if dim_redund > dim_mess:
 			raise ValueError
 
-	main_subc 	= codes.BinaryReedMullerCode(1, dim_redund)
+	main_subc	= codes.BinaryReedMullerCode(1, dim_redund)
 	subc_E		= main_subc.encoder("EvaluationVector")
 
 	proj_base = random_matrix(GF(2), dim_mess, dim_redund)
@@ -26,7 +26,7 @@ def SRM_Encoder(mess, dim_redund):
 
 
 def FWHT_ListDecoder(codew, dim_mess, dim_redund):
-	def thre(x):
+	def zign(x):
 		if (x > 0):
 			return 0
 		else:
@@ -44,7 +44,7 @@ def FWHT_ListDecoder(codew, dim_mess, dim_redund):
 		BF = BooleanFunction(BL.columns())
 		mags = BF.walsh_hadamard_transform()
 		for g in xrange(2^dim_redund):
-			Lres[g].append(thre(mags[g]))
+			Lres[g].append(zign(mags[g]))
 
 	Lres = map(vgf2,Lres)
 
