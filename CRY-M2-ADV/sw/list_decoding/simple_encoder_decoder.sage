@@ -26,12 +26,6 @@ def SRM_Encoder(mess, dim_redund):
 
 
 def FWHT_ListDecoder(codew, dim_mess, dim_redund):
-	def zign(x):
-		if (x > 0):
-			return 0
-		else:
-			return 1
-
 	def vgf2(x):
 		return vector(GF(2),x)
 
@@ -44,11 +38,12 @@ def FWHT_ListDecoder(codew, dim_mess, dim_redund):
 		BF = BooleanFunction(BL.columns())
 		mags = BF.walsh_hadamard_transform()
 		for g in xrange(2^dim_redund):
-			Lres[g].append(zign(mags[g]))
+			if mags[g] > 0:
+				Lres[g].append(0)
+			else:
+				Lres[g].append(1)
 
-	Lres = map(vgf2,Lres)
-
-	return Lres
+	return map(vgf2,Lres)
 
 
 def test(dim_mess, bias):
