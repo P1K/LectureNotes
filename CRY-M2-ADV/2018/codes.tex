@@ -1,0 +1,205 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[english]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{amsfonts}
+\usepackage{bm}
+\usepackage[hmargin=3cm,vmargin=2.4cm]{geometry}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+
+\hypersetup{
+  colorlinks=true,
+  citecolor=NavyBlue,
+  linkcolor=BrickRed,
+  urlcolor=Violet
+}
+
+\pagestyle{fancy}
+\fancyhead{}
+\fancyhead[L]{\href{https://www-ljk.imag.fr/membres/Pierre.Karpman/cry\_adv2018\_codes.pdf}{https://www-ljk.imag.fr/membres/Pierre.Karpman/cry\_adv2018\_codes.pdf}}
+
+\theoremstyle{definition}
+\newtheorem{defi}{Definition}
+\def\defiautorefname{Definition}
+\newtheorem{example}{Example}
+\def\defiautorefname{Example}
+
+\renewcommand{\labelitemi}{---}
+
+\DeclareMathOperator\bigo{\mathit{O}}
+\DeclareMathOperator\hd{\mathit{hd}}
+\DeclareMathOperator\wt{\mathit{wt}}
+\DeclareMathOperator\RM{\mathrm{RM}}
+\DeclareMathOperator\fun{\mathit{F}}
+\DeclareMathOperator\eval{eval}
+\newcommand\ftwo{\mathbb{F}_{2}}
+\newcommand\code{\mathcal{C}}
+\newcommand\zo{\{0,1\}}
+\newcommand\randraw{\xleftarrow{{\scriptscriptstyle\$}}}
+
+\renewcommand{\thefootnote}{\fnsymbol{footnote}}
+
+\title{Advanced cryptology (GBX9SY06)\\
+$\ast$\\
+Some coding theory aspects (useful) in cryptography}
+\date{2018-11}
+\author{Pierre Karpman}
+
+\begin{document}
+
+\maketitle{}
+
+\section{First definitions; examples}
+
+A \emph{linear code} of length $n$ and dimension $k$ over a field $\mathbb{K}$ is a $k$-dimensional subspace of $\mathbb{K}^n$. In these notes, we will focus on \emph{binary} codes, for which $\mathbb{K} = \mathbb{F}_2$, or possibly an extension thereof.\footnote{Consequently, we may take the liberty of
+equating subtraction with addition in any formula or algorithm. In order to minimize the confusion, we will try to make this systematic. Nonetheless, most of the discussion seamlessly generalises to other (finite) fields.}
+An important characteristic of a code is the \emph{minimum distance} (for the Hamming distance $\hd(\cdot,\cdot)$) $d$ between two (distinct) codewords. Define $\wt(\bm{x})$, $\bm{x} \in \ftwo^n$ as the number of
+non-zero coordinates of $\bm{x}$; $\hd(\bm{x},\bm{y})$ as $\wt(\bm{x}+\bm{y})$. Then the minimum distance of a code $\code$ is $\min_{\bm{x}\in\code,\bm{y}\neq\bm{c}\in\code} \hd(\bm{x},\bm{y})$, which by linearity of $\code$ is equivalent
+to $\min_{\bm{x}\neq\bm{0}\in\code} \wt(\bm{x})$. The main parameters of length, dimension, and minimum distance of a code $\code$ are summarized by saying that $\code$ is an $[n,k,d]_{\ftwo}$ code. While determining $n$ and $k$ is usually straightforward,
+it is in general a hard problem to compute $d$. 
+
+\smallskip
+
+Given a code $\code$, it will often be necessary to have an explicit \emph{encoding} map $\bm{x} \in \ftwo^k \mapsto \bm{x}' \in \code$ from \emph{messages} to \emph{codewords}. Such a map can be easily obtained by sampling $k$ linearly-independent codewords
+$\bm{g}_{1},\ldots,\bm{g}_{k}$ and forming the \emph{generator matrix} $\bm{G}$ whose rows are the $\bm{g}_i$s.\footnote{Note that the we use the convention that vectors are \emph{row} vectors, if not specified otherwise.} The encoding map is then
+simply $\bm{x} \mapsto \bm{x}\times\bm{G}$. One should remark that in general the matrix $\bm{G}$ (and thence the encoding map) will not be unique, as it depends on the selected codewords. A specific class of generator matrices are the ones in
+\emph{systematic form}, corresponding to block matrices $\begin{pmatrix}\bm{I}_k & \bm{A}\end{pmatrix}$, where $\bm{I}_k$ is the $k$-dimensional identity matrix and $\bm{A}$ is a \emph{redundancy} block. A code always admits at least one systematic encoder, up to a permutation of the coordinates
+of its codewords. One may be obtained by selecting $k$ linearly-independent columns of a generator matrix $\bm{G}$; applying a column permutation on $\bm{G}$ such that those columns are in the first $k$ positions; and computing the reduced row-echelon form
+of $\bm{G}$. In other words, one obtains an encoder in systematic form by finding a permutation matrix $\bm{P}$ such that $\bm{GP}$ is of the form $\bm{G}' := \begin{pmatrix}\bm{G}_1 & \bm{G}_2\end{pmatrix}$ where $\bm{G}_1$ is invertible, and by computing
+$\bm{G}_1^{-1}\bm{G}'$.
+
+From the existence of a systematic encoder, one deduces that the largest possible minimum distance (or weight) of an $[n,k]$ linear code is $d_{\text{MDS}} = n-k+1$, which is a special case of the Singleton bound. Indeed, the maximum possible
+weight of any row of a systematic encoder is 1 on the left (identity) block, and $n-k$ on the right (redundancy) block. A code reaching this bound is called \emph{maximum-distance separable}, or MDS.
+
+Finally, note that for some codes, there may exist alternative encoders
+that do not explicitly use a generator matrix.
+
+\begin{example}[AES MixColumn]
+	Let $\bm{M}$ be the matrix used in the MixColumn operation of the AES block cipher. The code generated by $\begin{pmatrix}\bm{I}_4 & \bm{M}\end{pmatrix}$ is an MDS code of paramateres $[8,4,5]_{\mathbb{F}_{2^8}}$.
+\end{example}
+
+\begin{example}[Binary Reed-Muller codes]
+	The binary Reed-Muller code of order $r$ and in $m$ variables $\RM(r,m)$ is the vector-space formed by the multi-point evaluations of $m$-variate Boolean functions of degree $\leq r$ over $\ftwo^m$. In other words,
+	a message is a Boolean function, and its associated (Reed-Muller) codeword is obtained by evaluating it over its entire domain.
+	
+	The codewords of this code have length $2^m$ and form a space of dimension $k := \sum_{i=0}^r\binom{m}{i}$.
+	It can be shown that the minimum weight of any codeword is $2^{m-r}$~\cite[Ch. 13, Thm. 3]{MS}. The parameters of $\RM(r,m)$ are thus $[2^m, k, 2^{m-r}]_{\ftwo}$.
+
+	A (non-systematic) encoding of a message can be efficiently computed by using a fast Möbius transform. Due to its involutive nature, the same transform can also be used to decode a codeword back to a message. However, this does not correct any
+	error and on its own it is thus of rather limited use.
+
+	Reed-Muller codes also follow a recursive ``$(u,u+v)$'' decomposition. One has that $\RM(r+1,m+1) = \{u||(u+v), u \in \RM(r+1,m), v \in \RM(r,m)\}$. This follows from the fact that an $(m+1)$-variate Boolean function $\fun(X_1,\ldots,X_{m+1})$
+	of degree at most $r+1$ can be written as $\fun^{0}(X_1,\ldots,X_m) + X_{m+1}\fun^{1}(X_1,\ldots,X_m)$, with
+	%where $\fun^{0}$ (resp. $\fun^1$) is obtained by partial evaluation of $\fun$ by taking $X_{m+1} = 0$ (resp. $X_{m+1} = 1$).
+	$\deg(\fun^0) \leq r+1$ and $\deg(\fun^1) \leq r$. Furthermore, if we write $\fun^{0+}$ the $m+1$-variate function whose monomials are identical
+	to $\fun^0$, $\fun^{1+}$ for % the $m+1$-variate function equal to
+	$X^{m+1}\fun^{1}$,
+	and $\vec{X}_{1,m}$ a given assignement for the indeterminates $X_1,\ldots,X_m$, 
+	then 
+	we always have:
+	\begin{itemize}
+		\item $\eval(\fun^0,(\vec{X}_{1,m})) = \eval(\fun^{0+},(\vec{X}_{1,m},0)) = \eval(\fun^{0+},(\vec{X}_{1,m},1))$;
+		\item $\eval(\fun^1,(\vec{X}_{1,m})) = \eval(\fun^{1+},(\vec{X}_{1,m},1))$;
+		\item $\eval(\fun^{1+},(\vec{X}_{1,m},0)) = 0$;
+	\end{itemize}
+	and the decomposition follows. Finally, one may notice that this is essentially the same induction as the one used in the fast
+	Möbius transform algorithm.
+\end{example}
+
+\medskip
+
+Given a code $\code$, it is often important to be able to determine if a vector of its ambient space is a codeword or not.
+This may be done using a map $\bm{x} \mapsto \bm{y}$ s.t. $\bm{y}$ is ``zero'' iff. $\bm{x} \in \code$. One typically implements this with a \emph{parity-check matrix} $\bm{H} \in \ftwo^{n-k\times n}$
+which is a basis of the (right) kernel of a generator matrix $\bm{G}$ of $\code$; the corresponding map, of codomain $\ftwo^{n-k}$, is then $\bm{x} \mapsto \bm{H}\times\bm{x}$. Equivalently, $\bm{H}$ is made of $(n-k)$ linearly-independent vectors of $\ftwo^n$ whose scalar product with any element of $\code$ is zero, and $\bm{H}\bm{G}^t$ and
+$\bm{G}\bm{H}^t$ are both zero matrices. A parity-check matrix generates the \emph{dual} of $\code$, written $\code^\bot$, which is thence an $[n,n-k]$ code.
+
+\section{Information set decoding}
+
+In this section we focus on the problem of finding ``low-weight'' codewords of  a code, which is also essentially equivalent to finding a close-by codeword to a given vector, i.e. to decode.
+This is generally a hard problem for codes that do not exhibit any particular structure (for instance if they are defined from a uniformly random generator matrix), but efficient algorithms may exist for some specific codes. For now we will focus on
+``inefficient'' generic algorithms that work for any code, but we will later present a good \emph{list decoder} for (punctured and shortened) first-order Reed-Muller codes.
+
+\smallskip
+
+Let $\code$ be an $[n,k,d]$ code for which $\bm{G}$ is a generator matrix. Enumerating all the codewords of $\code$ can trivially be done in time $2^k$ by multiplying $\bm{G}$ by all the vectors of $\ftwo^k$. This immediately allows to find
+a weight-$d$ codeword of $\code$ or to decode to the (or one of the) closest codeword(s),
+but the cost is quickly prohibitive.
+
+A first remark on the way to find better alternatives is that the problem that one needs to solve usually does not require to enumerate all the codewords of $\code$. For instance, one may not need to find a codeword of \emph{minimum} weight,
+but finding one of weight less than a known bound may be enough. Similarly, in a decoding context, one may know an upper-bound on the error weight. It is then possible to use a probabilistic algorithm that stops when a ``good-enough''
+solution has been found.
+
+A second remark is that the decoding problem can be solved by finding low-weight codewords; this will be used to justify the fact that we solely focus on algorithms for the latter. This can be explained in the following way: let 
+$\bm{c} \in \code$ be an initial codeword, and $\bm{\hat{c}} = \bm{c} + \bm{e}$ be a noisy codeword obtained by adding a noise $\bm{e}$ of weight $w \leq  \textit{max weight} <
+\lfloor(d-1)/2\rfloor$. Then $\bm{c}$
+is the unique closest codeword to $\bm{\hat{c}}$, and $\bm{e}$ is the unique vector of weight $w$ in the affine subspace $\bm{e} + \code$. Furthermore, this latter vector can be found by searching for a ``codeword'' of weight
+$w$ in the code generated by $\begin{pmatrix}\bm{G}\\ \bm{\hat{c}}\\ \end{pmatrix}$. This codeword will even be unique, as for any $\bm{c}' \neq \bm{c} \in \code$, $\wt(\bm{c}' + \bm{\hat{c}}) = \wt(\bm{c}' + \bm{c} + \bm{e})
+	\geq \wt(\bm{c}' + \bm{c}) - \wt(e) \geq d - \textit{max weight} > w$.
+
+\medskip
+
+The first probabilistic alternative to exhaustive search that we present is quite simple~\cite{Prange,McEliece}. Given $\bm{G}$, randomly select $k$ linearly-independent columns; this is called an \emph{information set}. Then permute these columns
+to the first $k$ positions of $\bm{G}$, and compute the reduced row-echelon form (i.e. compute an alternative generator matrix $\bm{G}'$ in systematic form, associated to the selected information set).
+Finally, check if any of the resulting $k$ rows have a weight less than the input bound. The idea behind this algorithm is that any row of the obtained systematic encoder has by definition a very low weight of exactly one on its first $k$ positions,
+and the weight on the remaining $n-k$ positions depends on a random codeword linear combination. One then hopes that for \emph{some} information sets, the weight on these latter positions we also be small, resulting in an overall low-weight codeword.
+In other words, the algorithm will return a weight-$w$ codeword after examining a given information set if it is s.t. there is a codeword of weight 1 over the information set and of weight
+$w - 1$ over its complement, the \emph{redundancy set}.
+
+There is also a simple interpretation of this algorithm if one directly thinks of it in a ``decoding'' sense. An information set is by definition a set of positions that carries enough information to fully determine the message corresponding to a codeword.
+Indeed, given the value of a codeword on an information set, one can reconstruct the entire (non-noisy) codeword by simply applying an encoder systematic w.r.t. this set;
+it is then easy to invert the encoding to go back to the original message.
+Thus, what the above does is (randomly) trying to find an information set over which the error vector is all-zero.
+
+\smallskip
+
+A variant of the above first algorithm due to Lee and Brickell~\cite{LeeBrickell} consists, for each information set, in checking the weight of all linear combinations of rows of $\bm{G}'$ of weight less than a small value $p$ (typically 2 or 3). This somehow amortizes 
+the cost of computing $\bm{G}'$ by considering more codewords for each matrix, as now the algorithm returns on a given information set if
+a codeword's weight splits as $(i,w-i), 1 \leq i \leq p$ over itself and its complement.
+Also, note that for binary codes, computing all of these can be done particularly efficiently by using Gray codes.
+
+\smallskip
+
+Another variant due to Leon aims to reduce the practical cost of checking the weight of a codeword, and is thus mostly useful for long codes. The idea is simply to first check
+if a codeword generated from the above procedure has a small weight on a few positions (i.e. to first consider a short \emph{punctured} code), and only to look at the entire
+codeword in that case. For instance, if one requires the punctured codeword to have weight zero on its redundancy set of size $l$, one is in effect searching for codewords
+whose weight splits as $(i,0,w-i), 1 \leq i \leq p$ over the information set, and the non-punctured (resp. punctured) redundancy positions.
+
+While this approach looks at fewer candidates per information set as the Lee-Brickell algorithm, this is hoped to be counter-balanced by more efficient implementations.
+
+\medskip
+
+Another algorithm due to Stern still follows the overall same approach, but improves the time complexity at the cost of some memory~\cite{Stern}. The key idea is to split the search
+space into two lists and to exploit collisions to obtain a quadratic speed-up at some stage of the search. Starting from the initial algorithm, one splits the information set
+into two subsets $I_1$ and $I_2$, and forms the lists $\Lambda_1$ and $\Lambda_2$ of codewords of weight less than $p$ on each subset respectively. Then one only fully checks the weight of
+codewords formed by the sum of elements of $\Lambda_1$ and $\Lambda_2$ that are identical over $l$ prescribed positions $Z$ of the redundancy set. One is then searching for codewords
+whose weight splits as $(i,j,0,w-i-j), 1 \leq i,j \leq p$ over $I_1$, $I_2$, $Z$ and the remainder.
+
+It is essential to notice that for a given information set, checking for each of the $\#\Lambda_1\#\Lambda_2$ candidate codewords if it is of the above form indeed takes a cost
+linear in $\#\Lambda_{1,2}$ (by using an appropriate data structure).
+
+Finally, one may remark that this algorithm takes more input parameters than the previous ones. This, together with the fact that it is not memory-less may make it harder to
+determine what parameter choice is best suited to a given code.
+
+\medskip
+
+An important observation made by Canteaut and Chabaud~\cite{CanteautChabaud} is that the most expensive step in the above algorithms is the computation of the systematic encoder for a given
+information set. They then suggest that instead of selecting a new independent information set at every iteration, one may ``update'' the current set by randomly replacing one
+of its columns by one column of the redundancy set, which is much more efficient. Furthermore, one can easily be convinced that after a few iterations, the obtained information
+set will be essentially independent from the starting one, hence there is no risk that one gets stuck in a small subset of the search space considered by the other algorithms.
+
+We will conclude by describing how to efficiently update an information set. Let $\bm{G} = \begin{pmatrix}\bm{I} & \bm{A}\end{pmatrix}$ be a systematic generator matrix;
+our objective is to compute $\bm{G}' = \begin{pmatrix}\bm{I} & \bm{A}'\end{pmatrix}$ which is a generator matrix for the same code and equal to the
+reduced row-echelon form of a matrix obtained from $\bm{G}$ by swapping one column $\bm{I}_{\cdot,i}$ of the identity with one column
+$\bm{A}_{\cdot,j}$ of the redundancy matrix. First notice that this latter
+process only results in a systematic matrix if $\bm{A}_{\cdot,j}$ is linearly independent from $\bm{I}\backslash\bm{I}_{\cdot,i}$, which is equivalent to
+requiring that $\bm{A}_{i,j} = 1 \neq 0$. Second, the matrix $\bm{A}'$ is simply obtained from $\bm{A}$ by adding the row $\bm{A}_{i}$
+to every row $\bm{A}_{i'}$ where $\bm{A}_{i',j} = 1$. Indeed, this corresponds to the ``reduction'' step one needs to perform after swapping the above two columns. 
+
+
+\bibliographystyle{alpha}
+\bibliography{tehbib}
+
+\end{document}
