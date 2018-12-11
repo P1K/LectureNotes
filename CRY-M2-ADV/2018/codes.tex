@@ -29,14 +29,16 @@
 
 \renewcommand{\labelitemi}{---}
 
+\DeclareMathOperator\code{\mathcal{C}}
 \DeclareMathOperator\bigo{\mathit{O}}
 \DeclareMathOperator\hd{\mathit{hd}}
 \DeclareMathOperator\wt{\mathit{wt}}
 \DeclareMathOperator\RM{\mathrm{RM}}
 \DeclareMathOperator\fun{\mathit{F}}
 \DeclareMathOperator\eval{eval}
+\DeclareMathOperator\Ber{Ber}
+\DeclareMathOperator\rank{rank}
 \newcommand\ftwo{\mathbb{F}_{2}}
-\newcommand\code{\mathcal{C}}
 \newcommand\zo{\{0,1\}}
 \newcommand\randraw{\xleftarrow{{\scriptscriptstyle\$}}}
 
@@ -59,7 +61,7 @@ equating subtraction with addition in any formula or algorithm. In order to mini
 An important characteristic of a code is the \emph{minimum distance} (for the Hamming distance $\hd(\cdot,\cdot)$) $d$ between two (distinct) codewords. Define $\wt(\bm{x})$, $\bm{x} \in \ftwo^n$ as the number of
 non-zero coordinates of $\bm{x}$; $\hd(\bm{x},\bm{y})$ as $\wt(\bm{x}+\bm{y})$. Then the minimum distance of a code $\code$ is $\min_{\bm{x}\in\code,\bm{y}\neq\bm{c}\in\code} \hd(\bm{x},\bm{y})$, which by linearity of $\code$ is equivalent
 to $\min_{\bm{x}\neq\bm{0}\in\code} \wt(\bm{x})$. The main parameters of length, dimension, and minimum distance of a code $\code$ are summarized by saying that $\code$ is an $[n,k,d]_{\ftwo}$ code. While determining $n$ and $k$ is usually straightforward,
-it is in general a hard problem to compute $d$. 
+it is in general a hard problem to compute $d$.
 
 \smallskip
 
@@ -97,8 +99,8 @@ that do not explicitly use a generator matrix.
 	$\deg(\fun^0) \leq r+1$ and $\deg(\fun^1) \leq r$. Furthermore, if we write $\fun^{0+}$ the $m+1$-variate function whose monomials are identical
 	to $\fun^0$, $\fun^{1+}$ for % the $m+1$-variate function equal to
 	$X^{m+1}\fun^{1}$,
-	and $\vec{X}_{1,m}$ a given assignement for the indeterminates $X_1,\ldots,X_m$, 
-	then 
+	and $\vec{X}_{1,m}$ a given assignement for the indeterminates $X_1,\ldots,X_m$,
+	then
 	we always have:
 	\begin{itemize}
 		\item $\eval(\fun^0,(\vec{X}_{1,m})) = \eval(\fun^{0+},(\vec{X}_{1,m},0)) = \eval(\fun^{0+},(\vec{X}_{1,m},1))$;
@@ -119,7 +121,7 @@ $\bm{G}\bm{H}^t$ are both zero matrices. A parity-check matrix generates the \em
 \section{Information set decoding}
 
 In this section we focus on the problem of finding ``low-weight'' codewords of  a code, which is also essentially equivalent to finding a close-by codeword to a given vector, i.e. to decode.
-This is generally a hard problem for codes that do not exhibit any particular structure (for instance if they are defined from a uniformly random generator matrix), but efficient algorithms may exist for some specific codes. For now we will focus on
+This is generally a hard problem for codes that do not exhibit any particular structure (for instance if they are defined from a uniformly random generator matrix), as it is NP-hard~\cite{codeshard}, but efficient algorithms may exist for some specific codes. For now we will focus on
 ``inefficient'' generic algorithms that work for any code, but we will later present a good \emph{list decoder} for (punctured and shortened) first-order Reed-Muller codes.
 
 \smallskip
@@ -132,7 +134,7 @@ A first remark on the way to find better alternatives is that the problem that o
 but finding one of weight less than a known bound may be enough. Similarly, in a decoding context, one may know an upper-bound on the error weight. It is then possible to use a probabilistic algorithm that stops when a ``good-enough''
 solution has been found.
 
-A second remark is that the decoding problem can be solved by finding low-weight codewords; this will be used to justify the fact that we solely focus on algorithms for the latter. This can be explained in the following way: let 
+A second remark is that the decoding problem can be solved by finding low-weight codewords; this will be used to justify the fact that we solely focus on algorithms for the latter. This can be explained in the following way: let
 $\bm{c} \in \code$ be an initial codeword, and $\bm{\hat{c}} = \bm{c} + \bm{e}$ be a noisy codeword obtained by adding a noise $\bm{e}$ of weight $w \leq  \textit{max weight} <
 \lfloor(d-1)/2\rfloor$. Then $\bm{c}$
 is the unique closest codeword to $\bm{\hat{c}}$, and $\bm{e}$ is the unique vector of weight $w$ in the affine subspace $\bm{e} + \code$. Furthermore, this latter vector can be found by searching for a ``codeword'' of weight
@@ -155,7 +157,7 @@ Thus, what the above does is (randomly) trying to find an information set over w
 
 \smallskip
 
-A variant of the above first algorithm due to Lee and Brickell~\cite{LeeBrickell} consists, for each information set, in checking the weight of all linear combinations of rows of $\bm{G}'$ of weight less than a small value $p$ (typically 2 or 3). This somehow amortizes 
+A variant of the above first algorithm due to Lee and Brickell~\cite{LeeBrickell} consists, for each information set, in checking the weight of all linear combinations of rows of $\bm{G}'$ of weight less than a small value $p$ (typically 2 or 3). This somehow amortizes
 the cost of computing $\bm{G}'$ by considering more codewords for each matrix, as now the algorithm returns on a given information set if
 a codeword's weight splits as $(i,w-i), 1 \leq i \leq p$ over itself and its complement.
 Also, note that for binary codes, computing all of these can be done particularly efficiently by using Gray codes.
@@ -196,7 +198,58 @@ reduced row-echelon form of a matrix obtained from $\bm{G}$ by swapping one colu
 $\bm{A}_{\cdot,j}$ of the redundancy matrix. First notice that this latter
 process only results in a systematic matrix if $\bm{A}_{\cdot,j}$ is linearly independent from $\bm{I}\backslash\bm{I}_{\cdot,i}$, which is equivalent to
 requiring that $\bm{A}_{i,j} = 1 \neq 0$. Second, the matrix $\bm{A}'$ is simply obtained from $\bm{A}$ by adding the row $\bm{A}_{i}$
-to every row $\bm{A}_{i'}$ where $\bm{A}_{i',j} = 1$. Indeed, this corresponds to the ``reduction'' step one needs to perform after swapping the above two columns. 
+to every row $\bm{A}_{i'}$ where $\bm{A}_{i',j} = 1$. Indeed, this corresponds to the ``reduction'' step one needs to perform after swapping the above two columns.
+
+\section{Learning Parity with Noise cryptosystems}
+
+In this section, we introduce the \emph{Learning Parity with Noise} (LPN) problem, and its application to the design of cryptosystems.
+The LPN problem is rather attractive because of its very concise description. Let $\bm{s} \in \ftwo^k$, $\bm{a} \randraw \ftwo^k$,
+$e \leftarrow \Ber_\eta$, where $\Ber_\eta$ is the Bernoulli distribution of parameter $\eta$; that is,
+$\Pr[e = 1] = \eta$. Then the LPN problem is to guess the value of the
+scalar product $\bm{s} \cdot \bm{a}$ when given $(\bm{a},\bm{s} \cdot \bm{a} + e)$. An algorithm is then said to solve
+this problem with advantage $\varepsilon$ if it answers correctly with probability $p$ and $2|p - 1/2| = \varepsilon$.
+
+It is clear that if $\eta = 1/2$, the distribution of $\bm{a}\cdot\bm{s} + e$ is independent of $\bm{a}$ and $\bm{s}$, and no algorithm
+can succeed with a non-zero advantage. Similarly, without prior knowledge about $\bm{s}$ and except when $\bm{a} = \bm{0}$, one cannot hope
+to solve the problem given a \emph{single} query of the above form, even in the absence of noise (i.e. even when $\eta = 0$). It is then natural to extend the problem to arbitrarily-many queries $q$, where
+the unknown (secret) vector $\bm{s}$ is kept constant. One may then reformulate the problem as letting $\bm{A} \randraw \ftwo^{k\times q}$,
+$\bm{e} \leftarrow \Ber_{\eta,q}$ (that is, each bit of $\bm{e} \in \ftwo^q$ has independent probability $\eta$ to be equal to one), and asking to distinguish
+$(\bm{A},\bm{s}\bm{A} + \bm{e})$ from $(\bm{A}, \bm{u})$ where $\bm{u} \randraw \ftwo^q$. An algorithm is then said to $(t,q)$ solve LPN$_{k,\eta}$ with advantage $\varepsilon$
+if it makes $q$ queries and has running time $t$.
+
+It is now again clear that if $\eta = 0$, the problem is trivially solvable as long as $\rank(\bm{A}) = k$, as it is then enough to identify $k$ linearly-independent columns of $\bm{A}$ to recover
+$\bm{s}$ (which then allows to predict all the other queries with advantage 1). In the more meaningful case where $\eta > 0$, recovering $\bm{s}$ becomes equivalent to decoding a noisy codeword for
+some random code of length $q$ (which is a parameter that may be chosen by the solving algorithm).
+We will discuss this matter in more details in the next section, and focus for now on some LPN-based cryptosystems.
+
+\medskip
+
+We first describe LPN-C, which is a family of symmetric encryption schemes defined by Gilbert et al.~\cite{LPNC}. While the confidentiality of an LPN-C instance reduces to the hardness of a corresponding
+LPN problem, the scheme is inherently malleable and must thus be used in conjunction with a MAC.
+
+An LPN-C instance is parameterized by a random code length $k$, a noise level $\eta$, a message length $r$, and the parameters of an $[m,r,d]$ binary code $\code$, assumed to be efficiently decodable up to $w$ errors and s.t. $\Pr[\wt(\bm{e}) > w : \bm{e} \leftarrow \Ber_{\eta,m}]$
+is small.
+The scheme works as follows. The sender and the receiver first share a secret random matrix $\bm{M} \in \ftwo^{k\times m}$. Then, to encrypt an $r$-bit message $\bm{x}$, the sender
+draws a vector $\bm{a} \randraw \ftwo^k$ and $\bm{e} \leftarrow \Ber_{\eta,m}$, computes $\bm{y} = \code(\bm{x}) + \bm{a}\bm{M} + \bm{e}$, and sends $(\bm{a},\bm{y})$ to the receiver.
+To decrypt, the receiver computes $\hat{\bm{x}} = \bm{y} + \bm{a}\bm{M} = \bm{x} + \bm{e}$, and uses the decoder of $\code$ to recover $\bm{x}$.
+The designers of LPN-C proposed some parameters for secure instantiations of LPN-C, but without specifying which code $\code$ to choose. An example is to take $k = 768$, $m = 160$, $\eta = 1/20$, $r = 75$, $d = 25$.
+
+An informal way to argue about the security of this scheme is that if one uses parameters for which the LPN problem is hard to solve, then the (encoded) message $\code(\bm{x})$ is whitened
+by a pseudo-random mask $\bm{a}\bm{M} + \bm{e}$ which is hard to distinguish from random, and is thus encrypted by a secure ``stream cipher''.
+
+
+
+% LPN-C (sym.)
+
+% LPN Asym
+
+% Ring-LPN
+
+% \section{LPN solving algorithms}
+
+% resampler
+
+% as a coding problem
 
 
 \bibliographystyle{alpha}
