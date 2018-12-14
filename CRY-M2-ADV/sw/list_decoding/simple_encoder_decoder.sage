@@ -8,9 +8,7 @@ def SRM_Encoder(mess, dim_redund):
 	main_subc	= codes.BinaryReedMullerCode(1, dim_redund)
 	subc_E		= main_subc.encoder("EvaluationVector")
 
-	proj_base = random_matrix(GF(2), dim_mess, dim_redund)
-	while not (proj_base.rank() == dim_redund): # ``why would you want a do .... while?''
-		proj_base = random_matrix(GF(2), dim_mess, dim_redund)
+	proj_base = codes.random_linear_code(GF(2), dim_mess, dim_redund).generator_matrix().transpose()
 	proj_base = block_matrix([zero_matrix(GF(2), dim_mess, 1), proj_base],ncols=2) # add a zero constant coefficient
 	proj_mess = mess * proj_base
 
