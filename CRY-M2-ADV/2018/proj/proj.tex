@@ -1,0 +1,104 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[english]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{amsfonts}
+\usepackage{bm}
+\usepackage[hmargin=3cm,vmargin=2.4cm]{geometry}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+
+\hypersetup{
+  colorlinks=true,
+  citecolor=NavyBlue,
+  linkcolor=BrickRed,
+  urlcolor=Violet
+}
+
+\pagestyle{fancy}
+\fancyhead{}
+\fancyhead[L]{\href{https://www-ljk.imag.fr/membres/Pierre.Karpman/cry\_adv2018\_proj.pdf}{\texttt{https://www-ljk.imag.fr/membres/Pierre.Karpman/cry\_adv2018\_proj.pdf}}}
+
+\theoremstyle{definition}
+\newtheorem{defi}{Definition}
+\def\defiautorefname{Definition}
+\newtheorem{example}{Example}
+\def\defiautorefname{Example}
+
+\renewcommand{\labelitemi}{---}
+
+\DeclareMathOperator\code{\mathcal{C}}
+\DeclareMathOperator\bigo{\mathit{O}}
+\DeclareMathOperator\hd{\mathit{hd}}
+\DeclareMathOperator\wt{\mathit{wt}}
+\DeclareMathOperator\RM{\mathrm{RM}}
+\DeclareMathOperator\fun{\mathit{F}}
+\DeclareMathOperator\eval{eval}
+\DeclareMathOperator\Ber{Ber}
+\DeclareMathOperator\rank{rank}
+\DeclareMathOperator\vspan{span}
+\DeclareMathOperator\gl{GL}
+\DeclareMathOperator\proj{\pi}
+\newcommand\ftwo{\mathbb{F}_{2}}
+\newcommand\zo{\{0,1\}}
+\newcommand\randraw{\xleftarrow{{\scriptscriptstyle\$}}}
+
+\renewcommand{\thefootnote}{\fnsymbol{footnote}}
+
+\title{Advanced cryptology (GBX9SY06)\\
+$\ast$\\
+Information set decoding project}
+\date{2018-12}
+\author{Pierre Karpman}
+
+\begin{document}
+
+\maketitle{}
+
+\section{Description}
+
+The goal of this project is to implement an information set decoding algorithm to search for low-weight codewords of \emph{binary} codes, using the
+SageMath software (\url{https://www.sagemath.org/}).
+There is no particular requirement as to which algorithm to implement, but overall efficiency will be rewarded.
+
+\subsection*{Performance evaluation}
+
+Your submission will be evaluated on a series of codes (defined below) on version 8.2 of SageMath running on the ``Retour d'Est'' (\url{retourdest.imag.fr})
+server. This is a single-processor system with 256~GB of memory and running an Intel(R) Xeon(R) Gold 6126 CPU @ 2.60GHz, that features 12 (resp. 24) physical (resp. logical) cores.
+You are encouraged to take advantage of this architecture, for instance by developping a multi-threaded implementation.
+
+The codes used for evaluation are the following, all defined in the provided file \url{https://www-ljk.imag.fr/membres/Pierre.Karpman/cry\_adv2018\_codes\_desc.sage}.
+\paragraph{Known codes.}
+\begin{itemize}
+	\item A binary BCH code of parameters $[511, 448, 15]$. The evaluation criterion will be the ability to find a minimum-weight codeword. This should take (far) less than a minute.
+	\item A binary BCH code of parameters $[511, 421, 21]$. The evaluation criterion will be the average time (over three runs) needed to find a minimum-weight codeword. This may take some time, but an efficient implementation should need (far) less than an hour on a single thread.
+	\item A binary BCH code of parameters $[511, 385, 29]$. The evaluation criterion will be the smallest weight of a found codeword after one run of at most 30 minutes. A bonus will be awarded if a word of weight 30 is found. An extra
+		bonus will be awarded if a word of weight 29 is found.
+\end{itemize}
+\paragraph{Random codes.}
+\begin{itemize}
+	\item A random code of parameters $[768, 384]$. The evaluation criterion will be the smallest weight of a found codeword after one run of at most 15 minutes.
+	\item A random code of parameters $[2048, 128]$. The evaluation criterion will be the smallest weight of a found codeword after one run of at most 15 minutes.
+\end{itemize}
+
+You are advised to use a slightly verbose implementation, that for instance prints the time required to find a codeword with a new lowest weight.
+
+\section{Instructions}
+Working in teams of two is allowed and encouraged. You must send your implementation to:
+\begin{center}
+\href{mailto:pierre.karpman@univ-grenoble-alpes.fr}{\texttt{pierre.karpman@univ-grenoble-alpes.fr}}
+\end{center}
+by Monday 2019-01-14T23:59+0100. No separate report is required, but your code must be well-commented and include a small textual description of your algorithmic and implementation choices.
+If your algorithm is parameterized, be sure to mention which parameters to use for every one of the evaluation codes. You are also advised to provide some numbers about your own
+performance evaluation of your implementation.
+Finally, you must prepare a short ($\sim$ 10 minutes for a single-person team; $\sim 2\times7$ minutes for a two-person one) presentation of your
+work for Thursday 2019-01-17.
+
+\nocite{*}
+
+\bibliographystyle{alpha}
+\bibliography{tehbib}
+
+\end{document}

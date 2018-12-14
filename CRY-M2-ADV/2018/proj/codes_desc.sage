@@ -1,0 +1,5 @@
+BCH511_15 = codes.BCHCode(GF(2), 511, 15)
+BCH511_21 = codes.BCHCode(GF(2), 511, 21)
+BCH511_29 = codes.BCHCode(GF(2), 511, 29)
+RAND748 = codes.random_linear_code(GF(2), 748, 384)
+RAND2048 = codes.random_linear_code(GF(2), 2048, 128)
