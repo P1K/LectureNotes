@@ -1,6 +1,6 @@
 from sage.crypto.boolean_function import BooleanFunction
 
-def SRM_Encoder(mess, dim_redund):
+def PRM_Encoder(mess, dim_redund):
 	dim_mess = mess.length()
 	if dim_redund > dim_mess:
 			raise ValueError
@@ -49,7 +49,7 @@ def test(dim_mess, bias):
 	dim_redund 	= ceil(log(1/(bias^2),2)) # + 1 for large-ish cases maybe
 	print log(1/(bias^2),2),dim_redund
 
-	codew = SRM_Encoder(mess, dim_redund)
+	codew = PRM_Encoder(mess, dim_redund)
 	print codew.ncols()
 	print "*"
 	error_rate	= 0.5 - bias
