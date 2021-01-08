@@ -1,5 +1,6 @@
 from sage.crypto.boolean_function import BooleanFunction
 
+# full encoder; simple but less efficient than doing it in chunks
 def PRM_Encoder(mess, dim_redund):
 	dim_mess = mess.length()
 	if dim_redund > dim_mess:
@@ -28,14 +29,14 @@ def FWHT_ListDecoder(codew, dim_mess, dim_redund):
 		return vector(GF(2),x)
 
 	Lres = []
-	for i in xrange(2^dim_redund): # sometimes python seriously sucks
+	for i in range(2^dim_redund): # sometimes python seriously sucks
 		Lres.append([])
 
 	for b in range(dim_mess):
 		BL = codew.submatrix(row=0,col=b*2^dim_redund,nrows=1,ncols=2^dim_redund)
 		BF = BooleanFunction(BL.columns())
 		mags = BF.walsh_hadamard_transform()
-		for g in xrange(2^dim_redund):
+		for g in range(2^dim_redund):
 			if mags[g] > 0:
 				Lres[g].append(0)
 			else:
@@ -46,21 +47,23 @@ def FWHT_ListDecoder(codew, dim_mess, dim_redund):
 
 def test(dim_mess, bias):
 	mess 		= random_vector(GF(2), dim_mess)
-	dim_redund 	= ceil(log(1/(bias^2),2)) # + 1 for large-ish cases maybe
-	print log(1/(bias^2),2),dim_redund
+	dim_redund 	= ceil(log(1/(bias^2),2)) #+ 1 for large-ish cases maybe
+	print(log(1/(bias^2),2),dim_redund)
 
 	codew = PRM_Encoder(mess, dim_redund)
-	print codew.ncols()
-	print "*"
+	print(mess)
+	print("*")
+	print(codew.ncols())
+	print("*")
 	error_rate	= 0.5 - bias
 	error_pos	= random_matrix(GF(2), 1, codew.ncols(), density=error_rate)
-	print error_rate,vector(error_pos).hamming_weight()
-	print "*"
-	noisycodew  = codew + error_pos
+	print(error_rate,vector(error_pos).hamming_weight())
+	print("*")
+	noisycodew = codew + error_pos
 
 	answ = FWHT_ListDecoder(noisycodew, dim_mess, dim_redund)
-	for i in range(len(answ)):
-		if answ[i] == mess:
+	for cm in answ:
+		if cm == mess:
 			return True
 
 	return False
